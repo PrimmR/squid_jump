@@ -103,7 +103,7 @@ struct Player {
   bool falling;
   int charge;
 
-  void setX(float newX) { // When x accelleration added
+  void setX(float newX) {  // When x accelleration added
     x = newX;
     box.x = newX;
   }
@@ -118,6 +118,13 @@ struct Player player = { WIDTH / 2, HEIGHT / 2, Rect(WIDTH / 2, HEIGHT / 2, PLAY
 Rect ground = Rect(0, HEIGHT - 2 * BLOCK_SIZE, WIDTH, BLOCK_SIZE);
 
 Rect platform = Rect(16, 16, 6 * BLOCK_SIZE, BLOCK_SIZE);
+
+// Camera
+#define CAM_UPPER_BOUNDARY 16 // Positions for which the camera starts to follow
+#define CAM_LOWER_BOUNDARY 40
+
+int camerapos = 0;  // + moves screen up
+int cameratick = 0;
 
 
 // FUNCTIONS
@@ -147,7 +154,8 @@ void gameinput() {
     player.charge = 0;
   }
 
-  // arduboy.print(player.charge);
+  arduboy.print(player.charge);
+  arduboy.print(" ");
 
   if (player.box.x < 0) {
     player.box.x = 0;
@@ -183,22 +191,35 @@ void physics() {
   // arduboy.print(player.y);
 }
 
+void movecamera() {
+  // PLayer location on screen player.box.y + camerapos
+  // camerapos = (-1 * player.y) + 40;
+  if (player.box.y + camerapos < CAM_UPPER_BOUNDARY) {
+    camerapos = -player.box.y + CAM_UPPER_BOUNDARY;
+  } else if (player.box.y + camerapos > CAM_LOWER_BOUNDARY) {
+    camerapos = -player.box.y + CAM_LOWER_BOUNDARY;
+  }
+
+  arduboy.print(camerapos);
+}
+
 void drawgame() {
   // ground
   for (int i = 0; i < ground.width; i++) {
-    Sprites::drawOverwrite(ground.x + i * BLOCK_SIZE, ground.y, Block, 0);
+    Sprites::drawOverwrite(ground.x + i * BLOCK_SIZE, ground.y + camerapos, Block, 0);
   }
   // Regular platform
   for (int i = 0; i < platform.width / BLOCK_SIZE; i++) {
-    Sprites::drawOverwrite(platform.x + i * BLOCK_SIZE, platform.y, Block, 0);
+    Sprites::drawOverwrite(platform.x + i * BLOCK_SIZE, platform.y + camerapos, Block, 0);
   }
   // Draw player
-  Sprites::drawExternalMask(player.box.x, player.box.y, Player, Player_Mask, 0, 0);
+  Sprites::drawExternalMask(player.box.x, player.box.y + camerapos, Player, Player_Mask, 0, 0);
 }
 
 void gameplay() {
   gameinput();
   physics();
+  movecamera();
   drawgame();
 }
 
