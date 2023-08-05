@@ -96,13 +96,24 @@ const uint8_t PROGMEM Block[] = {
 
 // Instances
 struct Player {
+  float x;
+  float y;
   Rect box;
   float velocity;  // Up is +
   bool falling;
   int charge;
+
+  void setX(float newX) { // When x accelleration added
+    x = newX;
+    box.x = newX;
+  }
+  void setY(float newY) {
+    y = newY;
+    box.y = newY;
+  }
 };
 
-struct Player player = { Rect(WIDTH / 2, HEIGHT / 2, PLAYER_SIZE, PLAYER_SIZE), 0, true, 0 };
+struct Player player = { WIDTH / 2, HEIGHT / 2, Rect(WIDTH / 2, HEIGHT / 2, PLAYER_SIZE, PLAYER_SIZE), 0, true, 0 };
 
 Rect ground = Rect(0, HEIGHT - 2 * BLOCK_SIZE, WIDTH, BLOCK_SIZE);
 
@@ -148,9 +159,9 @@ void gameinput() {
 // Calculates whether platform would be hit next frame
 bool collision(Rect platform) {  // Assume that it's always called by player
   if (player.velocity < 0) {
-    Rect ray = Rect(player.box.x, player.box.y + PLAYER_SIZE, player.box.width, -1 * player.velocity);
+    Rect ray = Rect(player.box.x, player.box.y + PLAYER_SIZE, player.box.width, -1 * ceil(player.velocity));
     Rect platformtop = Rect(platform.x, platform.y, platform.width, 1);
-    // arduboy.fillRect(player.box.x, player.box.y + PLAYER_SIZE, player.box.width, -1 * player.velocity); // Visual
+    // arduboy.fillRect(player.box.x, player.box.y + PLAYER_SIZE, player.box.width, -1 * ceil(player.velocity)); // Visual
     return Arduboy2::collide(ray, platformtop);
   }
   return false;
@@ -158,17 +169,18 @@ bool collision(Rect platform) {  // Assume that it's always called by player
 
 void physics() {
   if (player.falling) {
-    player.box.y -= player.velocity;
+    player.setY(player.box.y - player.velocity);
     player.velocity -= 0.1;
   }
   if (collision(ground)) {
-    player.box.y = ground.y - PLAYER_SIZE;
+    player.setY(ground.y - PLAYER_SIZE);
     player.falling = false;
   } else if (collision(platform)) {
-    player.box.y = platform.y - PLAYER_SIZE;
+    player.setY(platform.y - PLAYER_SIZE);
     player.falling = false;
   }
-  arduboy.print(player.velocity);
+  // arduboy.print(player.velocity);
+  // arduboy.print(player.y);
 }
 
 void drawgame() {
