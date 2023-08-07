@@ -12,12 +12,12 @@ int gamestate = GAME_PLAY;
 
 // Graphics
 #define REGULAR 0
-#define CHARGE_1 1
-#define CHARGE_2 2 // Used from here
+#define CHARGE_1 1  // Unused?
+#define CHARGE_2 2
 #define CHARGE_3 3
 #define CHARGE_4 4
 #define CHARGE_NUM 3
-int sprite = REGULAR; // Default
+int sprite = REGULAR;  // Default
 
 #define MAX_CHARGE 80
 
@@ -380,9 +380,19 @@ struct Player {
 
 struct Player player = { WIDTH / 2, HEIGHT / 2, 0, true, 0 };
 
-Rect ground = Rect(0, HEIGHT - 2 * BLOCK_SIZE, WIDTH, BLOCK_SIZE);
+struct Platform {
+  int x;
+  int y;
+  int len;
+};
 
-Rect platform = Rect(16, 16, 6 * BLOCK_SIZE, BLOCK_SIZE);
+// Rect ground = Rect(0, HEIGHT - 2 * BLOCK_SIZE, WIDTH, BLOCK_SIZE);
+
+struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
+
+struct Platform platform = { 16, 16, 6 };
+
+struct Platform platforms[3] = { ground, platform, {0,-20,7} };
 
 // Camera
 #define CAM_UPPER_BOUNDARY 16  // Positions for which the camera starts to follow
@@ -412,8 +422,8 @@ void gameinput() {
     }
   }
   if (arduboy.justReleased(A_BUTTON)) {
-    if (!player.falling && player.charge >= 15) {
-      player.velocity = static_cast<float>(player.charge) / 30;//20;
+    if (!player.falling && player.charge >= MAX_CHARGE / CHARGE_NUM) {
+      player.velocity = static_cast<float>(player.charge) / 20;
       player.falling = true;
     }
     player.charge = 0;
@@ -430,12 +440,12 @@ void gameinput() {
 }
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
-bool collision(Rect platform) {  // Assume that it's always called by player
+bool collision(Platform platform) {  // Assume that it's always called by player
   if (player.velocity < 0) {
     Rect ray = Rect(player.x, player.y + PLAYER_SIZE + camerapos, PLAYER_SIZE, -ceil(player.velocity));
-    Rect platformtop = Rect(platform.x, platform.y + camerapos, platform.width, 2);
+    Rect platformtop = Rect(platform.x, platform.y + camerapos, platform.len * BLOCK_SIZE, 2);
     // arduboy.fillRect(player.x, player.y + PLAYER_SIZE + camerapos, PLAYER_SIZE, -1 * ceil(player.velocity)); // Visual
-    // arduboy.fillRect(platform.x, platform.y + camerapos, platform.width, 1); // Visual
+    // arduboy.fillRect(platform.x, platform.y + camerapos, platform.len * BLOCK_SIZE, 2); // Visual
     return Arduboy2::collide(ray, platformtop);
   }
   return false;
@@ -446,15 +456,12 @@ void physics() {
     player.y -= player.velocity;
     player.velocity -= 0.1;
   }
-  if (collision(ground)) {
-    player.y = ground.y - PLAYER_SIZE;
+  for (auto const& plat : platforms) {
+    if (collision(plat)) {
+      player.y = plat.y - PLAYER_SIZE;
     player.falling = false;
-  } else if (collision(platform)) {
-    player.y = platform.y - PLAYER_SIZE;
-    player.falling = false;
+    }
   }
-  // arduboy.print(player.velocity);
-  // arduboy.print(player.y);
 }
 
 void movecamera() {
@@ -470,14 +477,12 @@ void movecamera() {
 }
 
 void drawgame() {
-  // ground
-  for (int i = 0; i < ground.width; i++) {
-    Sprites::drawOverwrite(ground.x + i * BLOCK_SIZE, ground.y + camerapos, Block, 0);
+  for (auto const& plat : platforms) { // For every platform in platforms
+    for (int i = 0; i < plat.len; i++) {
+      Sprites::drawOverwrite(plat.x + i * BLOCK_SIZE, plat.y + camerapos, Block, 0);
+    }
   }
-  // Regular platform
-  for (int i = 0; i < platform.width / BLOCK_SIZE; i++) {
-    Sprites::drawOverwrite(platform.x + i * BLOCK_SIZE, platform.y + camerapos, Block, 0);
-  }
+
   if (player.charge == MAX_CHARGE) {
     sprite = CHARGE_4;
   } else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 2) {
@@ -488,7 +493,7 @@ void drawgame() {
     sprite = REGULAR;
   }
 
-  
+
   // Draw player
   Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
 }
