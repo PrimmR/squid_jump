@@ -365,7 +365,7 @@ const uint8_t PROGMEM Block[] = {
 // Instances
 struct Player {
   float x;
-  float y;
+  double y;
   float velocity;  // Up is +
   bool falling;
   int charge;
@@ -386,21 +386,21 @@ struct Platform {
   int len;
 };
 
-// Rect ground = Rect(0, HEIGHT - 2 * BLOCK_SIZE, WIDTH, BLOCK_SIZE);
+#define MAX_PLATFORMS 30  // 'Not in the mood' for dynamic lists
 
-struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
+struct Stage {
+  int num;
+  struct Platform platforms[MAX_PLATFORMS];
+  int totalplatforms;
+};
 
-struct Platform platform = { 16, 16, 6 };
-
-struct Platform platforms[3] = { ground, platform, {0,-20,7} };
+struct Stage stage = { 0, {}, 0 };
 
 // Camera
 #define CAM_UPPER_BOUNDARY 16  // Positions for which the camera starts to follow
 #define CAM_LOWER_BOUNDARY 40
 
 int camerapos = 0;  // + moves screen up
-int cameratick = 0;
-
 
 // FUNCTIONS
 
@@ -429,6 +429,10 @@ void gameinput() {
     player.charge = 0;
   }
 
+  if (arduboy.justPressed(B_BUTTON)) {
+    nextstage();
+  }
+
   // arduboy.print(player.charge);
   // arduboy.print(" ");
 
@@ -437,6 +441,23 @@ void gameinput() {
   } else if (player.x + PLAYER_SIZE > WIDTH) {
     player.x = WIDTH - PLAYER_SIZE;
   }
+}
+
+void nextstage() {
+  struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
+  stage.platforms[0] = ground;
+  int lastheight = HEIGHT - 2 * BLOCK_SIZE;
+  for (int i = 1; i < 20; i++) {
+    int len = random(4, 8);
+    int x = random(0,(WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
+    int y = lastheight - random(5, 10) * BLOCK_SIZE;
+    stage.platforms[i] = { x, y, len };
+    lastheight = y;
+  }
+
+  stage.totalplatforms = 20;
+
+  stage.num++;
 }
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
@@ -456,30 +477,43 @@ void physics() {
     player.y -= player.velocity;
     player.velocity -= 0.1;
   }
-  for (auto const& plat : platforms) {
-    if (collision(plat)) {
-      player.y = plat.y - PLAYER_SIZE;
-    player.falling = false;
+  if (player.velocity > 12) {
+    player.velocity = 12;
+  }
+
+  // for (auto const& plat : stage.platforms) {
+  for (int i = 0; i < stage.totalplatforms; i++) {
+    if (!cull(stage.platforms[i])) {
+      if (collision(stage.platforms[i])) {
+        player.y = stage.platforms[i].y - PLAYER_SIZE;
+        player.falling = false;
+      }
     }
   }
 }
 
 void movecamera() {
-  // PLayer location on screen player.box.y + camerapos
+  // PLayer location on screen player.y + camerapos
   // camerapos = (-1 * player.y) + 40;
   if (player.y + camerapos < CAM_UPPER_BOUNDARY) {
     camerapos = -player.y + CAM_UPPER_BOUNDARY;
   } else if (player.y + camerapos > CAM_LOWER_BOUNDARY) {
     camerapos = -player.y + CAM_LOWER_BOUNDARY;
   }
-
   // arduboy.print(camerapos);
 }
 
+bool cull(struct Platform platform) {
+  return platform.y + camerapos + player.velocity > HEIGHT || platform.y + camerapos + BLOCK_SIZE < 0;
+}
+
 void drawgame() {
-  for (auto const& plat : platforms) { // For every platform in platforms
-    for (int i = 0; i < plat.len; i++) {
-      Sprites::drawOverwrite(plat.x + i * BLOCK_SIZE, plat.y + camerapos, Block, 0);
+  // for (auto& plat : stage.platforms) {  // For every platform in platforms
+  for (int k = 0; k < stage.totalplatforms; k++) {
+    if (!cull(stage.platforms[k])) {
+      for (int i = 0; i < stage.platforms[k].len; i++) {
+        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, 0);
+      }
     }
   }
 
@@ -502,6 +536,9 @@ void gameplay() {
   gameinput();
   physics();
   movecamera();
+
+  arduboy.print(stage.num);
+
   drawgame();
 }
 
@@ -531,6 +568,8 @@ void setup() {
   arduboy.display();
   arduboy.initRandomSeed();
   arduboy.clear();
+
+  nextstage();
 }
 
 void loop() {
