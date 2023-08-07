@@ -19,6 +19,11 @@ int gamestate = GAME_PLAY;
 #define CHARGE_NUM 3
 int sprite = REGULAR;  // Default
 
+#define MAX_X_VELOCITY 1.5
+#define X_VELOCITY_DECAY 0.1
+#define X_ACCEL 0.1
+#define MAX_Y_VELOCITY 12
+#define Y_ACCEL 0.1
 #define MAX_CHARGE 80
 
 #define PLAYER_SIZE 15
@@ -364,9 +369,10 @@ const uint8_t PROGMEM Block[] = {
 
 // Instances
 struct Player {
-  float x;
+  double x;
   double y;
-  float velocity;  // Up is +
+  float velocity;   // Up is +
+  float xvelocity;  // Right is +
   bool falling;
   int charge;
 
@@ -378,7 +384,7 @@ struct Player {
   }
 };
 
-struct Player player = { WIDTH / 2, HEIGHT / 2, 0, true, 0 };
+struct Player player = { WIDTH / 2, HEIGHT / 2, 0, 0, true, 0 };
 
 struct Platform {
   int x;
@@ -411,10 +417,10 @@ void titlescreen() {
 
 void gameinput() {
   if (arduboy.pressed(LEFT_BUTTON) && player.falling) {
-    player.x--;
+    player.xvelocity -= X_ACCEL + X_VELOCITY_DECAY;
   }
   if (arduboy.pressed(RIGHT_BUTTON) && player.falling) {
-    player.x++;
+    player.xvelocity += X_ACCEL + X_VELOCITY_DECAY;
   }
   if (arduboy.pressed(A_BUTTON)) {
     if (player.charge < MAX_CHARGE) {
@@ -435,12 +441,6 @@ void gameinput() {
 
   // arduboy.print(player.charge);
   // arduboy.print(" ");
-
-  if (player.x < 0) {
-    player.x = 0;
-  } else if (player.x + PLAYER_SIZE > WIDTH) {
-    player.x = WIDTH - PLAYER_SIZE;
-  }
 }
 
 void nextstage() {
@@ -449,7 +449,7 @@ void nextstage() {
   int lastheight = HEIGHT - 2 * BLOCK_SIZE;
   for (int i = 1; i < 20; i++) {
     int len = random(4, 8);
-    int x = random(0,(WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
+    int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
     int y = lastheight - random(5, 10) * BLOCK_SIZE;
     stage.platforms[i] = { x, y, len };
     lastheight = y;
@@ -473,12 +473,13 @@ bool collision(Platform platform) {  // Assume that it's always called by player
 }
 
 void physics() {
+  // Y
   if (player.falling) {
     player.y -= player.velocity;
-    player.velocity -= 0.1;
+    player.velocity -= Y_ACCEL;
   }
-  if (player.velocity > 12) {
-    player.velocity = 12;
+  if (player.velocity > MAX_Y_VELOCITY) {
+    player.velocity = MAX_Y_VELOCITY;
   }
 
   // for (auto const& plat : stage.platforms) {
@@ -490,6 +491,33 @@ void physics() {
       }
     }
   }
+
+  // X
+  if (player.xvelocity > MAX_X_VELOCITY) {
+    player.xvelocity = MAX_X_VELOCITY;
+  } else if (player.xvelocity < -MAX_X_VELOCITY) {
+    player.xvelocity = -MAX_X_VELOCITY;
+  }
+  if (player.falling) {
+    player.x += player.xvelocity;
+  } else {
+    player.xvelocity = 0;
+  }
+
+  if (player.xvelocity > 0) {
+    player.xvelocity -= 0.1;
+  } else if (player.xvelocity < 0) {
+    player.xvelocity += 0.1;
+  }
+
+  // Boundaries
+  if (player.intX() < 0) {
+    player.x = 0;
+  } else if (player.intX() + PLAYER_SIZE > WIDTH) {
+    player.x = WIDTH - PLAYER_SIZE;
+  }
+
+  arduboy.print(player.xvelocity);
 }
 
 void movecamera() {
