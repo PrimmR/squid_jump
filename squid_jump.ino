@@ -377,10 +377,10 @@ struct Player {
   int charge;
 
   int intX() {
-    return x;
+    return floor(x);
   }
   int intY() {
-    return y;
+    return floor(y);
   }
 };
 
@@ -407,6 +407,7 @@ struct Stage stage = { 0, {}, 0 };
 #define CAM_LOWER_BOUNDARY 40
 
 int camerapos = 0;  // + moves screen up
+
 
 // FUNCTIONS
 
@@ -447,7 +448,7 @@ void nextstage() {
   struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
   stage.platforms[0] = ground;
   int lastheight = HEIGHT - 2 * BLOCK_SIZE;
-  for (int i = 1; i < 20; i++) {
+  for (int i = 1; i < 30; i++) {
     int len = random(4, 8);
     int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
     int y = lastheight - random(5, 10) * BLOCK_SIZE;
@@ -517,18 +518,19 @@ void physics() {
     player.x = WIDTH - PLAYER_SIZE;
   }
 
-  arduboy.print(player.xvelocity);
+  // arduboy.print(player.xvelocity);
 }
 
 void movecamera() {
   // PLayer location on screen player.y + camerapos
   // camerapos = (-1 * player.y) + 40;
-  if (player.y + camerapos < CAM_UPPER_BOUNDARY) {
-    camerapos = -player.y + CAM_UPPER_BOUNDARY;
-  } else if (player.y + camerapos > CAM_LOWER_BOUNDARY) {
-    camerapos = -player.y + CAM_LOWER_BOUNDARY;
+  if (player.intY() + camerapos < CAM_UPPER_BOUNDARY) {
+    camerapos = -player.intY() + CAM_UPPER_BOUNDARY;
+  } else if (player.intY() + camerapos > CAM_LOWER_BOUNDARY) {
+    camerapos = -player.intY() + CAM_LOWER_BOUNDARY;
   }
-  // arduboy.print(camerapos);
+  arduboy.print(camerapos);
+  // arduboy.print(player.y);
 }
 
 bool cull(struct Platform platform) {
@@ -564,9 +566,6 @@ void gameplay() {
   gameinput();
   physics();
   movecamera();
-
-  arduboy.print(stage.num);
-
   drawgame();
 }
 
@@ -607,7 +606,6 @@ void loop() {
 
   arduboy.setCursor(0, 0);
   arduboy.pollButtons();
-
   arduboy.clear();
 
   gameloop();
