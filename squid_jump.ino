@@ -4,10 +4,14 @@
 #include <Arduboy2.h>
 Arduboy2 arduboy;
 
+#define CHAR_WIDTH 6
+#define CHAR_HEIGHT 8
+
 // Game states
 #define GAME_TITLE 0
 #define GAME_PLAY 1
 #define GAME_OVER 2
+#define GAME_STATUS 3
 int gamestate = GAME_PLAY;
 
 // Graphics
@@ -1507,10 +1511,10 @@ struct Stage {
   int totalplatforms;
 };
 
-struct Stage stage = { 0, {}, 0 };
+struct Stage stage = { 1, {}, 0 };
 
 // Camera
-#define CAM_UPPER_BOUNDARY 16  // Positions for which the camera starts to follow
+#define CAM_UPPER_BOUNDARY 20  // Positions for which the camera starts to follow
 #define CAM_LOWER_BOUNDARY 40
 
 int camerapos = 0;  // + moves screen up
@@ -1522,6 +1526,13 @@ struct Zapfish {
 struct Zapfish zapfish {
   0
 };
+
+// Status
+int score = 0;
+#define MISS 0
+#define GOAL 1
+int status = 0;
+int statustimer = 0;
 
 // FUNCTIONS
 
@@ -1551,14 +1562,14 @@ void gameinput() {
   }
 
   if (arduboy.justPressed(B_BUTTON)) {
-    nextstage();
+    resetstage();
   }
 
   // arduboy.print(player.charge);
   // arduboy.print(" ");
 }
 
-void nextstage() {
+void resetstage() {
   // Set up stage
   struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
   stage.platforms[0] = ground;
@@ -1576,13 +1587,12 @@ void nextstage() {
 
   stage.totalplatforms = 20;
 
-  stage.num++;
-
   // Reset states
   player = { WIDTH / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
   camerapos = 0;
   poisonheight = 128;
 }
+
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
 bool collision(Platform platform, int height) {  // Assume that it's always called by player
@@ -1664,7 +1674,8 @@ void poison() {
   poisonheight -= 0.25;
 
   if (player.y + PLAYER_SIZE > poisonheight + LEEWAY) {
-    gamestate = GAME_OVER;
+    resetstage();
+    setupstatus(MISS);
   }
 }
 
@@ -1673,7 +1684,9 @@ void zap() {
     Rect playerbox = Rect(player.intX(), player.intY(), PLAYER_SIZE, PLAYER_SIZE);
     Rect zapbox = Rect((WIDTH - ZAP_SIZE) / 2, zapfish.y, ZAP_SIZE, ZAP_SIZE);
     if (Arduboy2::collide(playerbox, zapbox)) {
-      nextstage();
+      stage.num++;
+      resetstage();
+      setupstatus(GOAL);
     }
   }
 }
@@ -1737,7 +1750,39 @@ void gameplay() {
   zap();
   physics();
   movecamera();
-  drawgame();
+  if (gamestate == GAME_PLAY) {
+    drawgame();
+  }
+}
+
+void setupstatus(int event) {
+  status = event;
+  statustimer = 180;
+  gamestate = GAME_STATUS;
+}
+
+void gamestatus() {
+  if (status == MISS) {
+    arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_OFF);
+    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    arduboy.print("MISS");
+  } else if (status == GOAL) {
+    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
+    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    arduboy.print("GOAL");
+  }
+
+  arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("LEVEL: ");
+  arduboy.print(stage.num);
+
+
+  if (statustimer <= 0) {
+    arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
+    gamestate = GAME_PLAY;
+  } else {
+    statustimer--;
+  }
 }
 
 void gameoverscreen() {
@@ -1754,6 +1799,10 @@ void gameloop() {
       gameplay();
       break;
 
+    case GAME_STATUS:
+      gamestatus();
+      break;
+
     case GAME_OVER:
       gameoverscreen();
       break;
@@ -1767,7 +1816,7 @@ void setup() {
   arduboy.initRandomSeed();
   arduboy.clear();
 
-  nextstage();
+  resetstage();
 }
 
 void loop() {
