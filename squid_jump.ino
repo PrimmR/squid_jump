@@ -2,7 +2,10 @@
 // Squid Jump
 
 #include <Arduboy2.h>
+#include <ArduboyTones.h>
 Arduboy2 arduboy;
+ArduboyTones sound(arduboy.audio.enabled);
+
 
 #define CHAR_WIDTH 6
 #define CHAR_HEIGHT 8
@@ -1513,11 +1516,6 @@ struct Stage {
 
 struct Stage stage = { 1, {}, 0 };
 
-// Camera
-#define CAM_UPPER_BOUNDARY 20  // Positions for which the camera starts to follow
-#define CAM_LOWER_BOUNDARY 40
-
-int camerapos = 0;  // + moves screen up
 
 struct Zapfish {
   int y;
@@ -1527,7 +1525,17 @@ struct Zapfish zapfish {
   0
 };
 
+// Camera
+#define CAM_UPPER_BOUNDARY 20  // Positions for which the camera starts to follow
+#define CAM_LOWER_BOUNDARY 40
+
+int camerapos = 0;  // + moves screen up
+
+// Sound
+const uint16_t jump_sound[] PROGMEM = { NOTE_D6, 40, NOTE_D5, 40, NOTE_FS6, 40, TONES_END };
+
 // Status
+int lives = 3;
 int score = 0;
 #define MISS 0
 #define GOAL 1
@@ -1557,6 +1565,8 @@ void gameinput() {
     if (!player.falling && player.charge >= MAX_CHARGE / CHARGE_NUM) {
       player.velocity = static_cast<float>(player.charge) / 20;
       player.falling = true;
+
+      sound.tones(jump_sound);
     }
     player.charge = 0;
   }
