@@ -6,9 +6,9 @@
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 
-#include "Sprites.h"
-#include "Structs.h"
-#include "Sound.h"
+#include "Sprites.hpp"
+#include "Structs.hpp"
+#include "Sound.hpp"
 
 
 #define CHAR_WIDTH 6
@@ -19,7 +19,7 @@ ArduboyTones sound(arduboy.audio.enabled);
 #define GAME_PLAY 1
 #define GAME_OVER 2
 #define GAME_STATUS 3
-int gamestate = GAME_PLAY;
+int gamestate = GAME_TITLE;
 
 // Graphics
 int sprite = REGULAR;  // Default
@@ -35,9 +35,11 @@ float poisonheight = 128;
 #define LEEWAY 8
 #define POISON_SPEED 0.25
 
-#define ZAP_UP 42
+#define ZAP_UP 86
 
-struct Player player = { WIDTH / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
+#define LIFE_SPACING 10
+
+struct Player player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
 
 struct Stage stage = { 1, {}, 0 };
 
@@ -56,15 +58,48 @@ byte lives = 3;
 int score = 0;
 #define MISS 0
 #define GOAL 1
+#define START 2
 int status = 0;
 int statustimer = 0;
+
+bool showtextblink = true;
 
 
 // FUNCTIONS
 
 
 void titlescreen() {
-  arduboy.print("title");
+  arduboy.setCursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+  arduboy.print("SQUID JUMP");
+
+  arduboy.setCursor((WIDTH - 16 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("PRESS");
+
+  if (showtextblink) {
+    arduboy.print(" A ");
+  }
+
+  arduboy.setCursor((WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("TO START");
+
+
+
+  if (arduboy.everyXFrames(30)) {
+    showtextblink = !showtextblink;
+  }
+
+
+  if (arduboy.justPressed(A_BUTTON)) {
+    startgame();
+  }
+}
+
+void startgame() {
+  lives = 3;
+  score = 0;
+
+  resetstage();
+  setupstatus(START);
 }
 
 void gameinput() {
@@ -90,7 +125,11 @@ void gameinput() {
   }
 
   if (arduboy.justPressed(B_BUTTON)) {
-    resetstage();
+    if (arduboy.pressed(UP_BUTTON)) {
+      lives++;
+    } else if (arduboy.pressed(DOWN_BUTTON)) {
+      lives--;
+    }
   }
 
   // arduboy.print(player.charge);
@@ -116,7 +155,7 @@ void resetstage() {
   stage.totalplatforms = 20;
 
   // Reset states
-  player = { WIDTH / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
+  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
   camerapos = 0;
   poisonheight = 128;
 }
@@ -208,6 +247,7 @@ void poison() {
       setupstatus(MISS);
     } else {
       gamestate = GAME_OVER;
+      showtextblink = true;
     }
   }
 }
@@ -283,7 +323,7 @@ void gameplay() {
   zap();
   physics();
   movecamera();
-  if (gamestate == GAME_PLAY) {
+  if (gamestate == GAME_PLAY) {  // Prevents flashes when going to status screen
     drawgame();
   }
 }
@@ -303,15 +343,24 @@ void gamestatus() {
     arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
     arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
     arduboy.print("GOAL");
+  } else if (status == START) {
+    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
+    arduboy.setCursor(WIDTH / 2 - 3 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    arduboy.print("START!");
   }
 
-  arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
-  arduboy.print("LIVES: ");
-  arduboy.print(lives);
+  for (int i = 0; i < lives; i++) {
+    // ((WIDTH - LIFE_SIZE - (lives-1) * LIFE_SPACING) / 2) + LIFE_SPACING * i)
+    Sprites::drawOverwrite((WIDTH - LIFE_SIZE) / 2 - (lives - 1) * (LIFE_SPACING / 2) + LIFE_SPACING * i, (HEIGHT - LIFE_SIZE) / 2, Life, 0);
+  }
 
   arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
   arduboy.print("LEVEL: ");
   arduboy.print(stage.num);
+
+  if (arduboy.justPressed(A_BUTTON)) {  // Just for testing?
+    statustimer = 0;
+  }
 
 
   if (statustimer <= 0) {
@@ -323,7 +372,28 @@ void gamestatus() {
 }
 
 void gameoverscreen() {
-  arduboy.print("game over");
+  arduboy.setCursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+  arduboy.print("GAME OVER!");
+
+  arduboy.setCursor((WIDTH - 19 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("PRESS");
+
+  if (showtextblink) {
+    arduboy.print(" A ");
+  }
+
+  arduboy.setCursor((WIDTH - 3 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("TO CONTINUE");
+
+
+
+  if (arduboy.everyXFrames(30)) {
+    showtextblink = !showtextblink;
+  }
+
+  if (arduboy.justPressed(A_BUTTON)) {
+    gamestate = GAME_TITLE;
+  }
 }
 
 void gameloop() {
@@ -353,7 +423,7 @@ void setup() {
   arduboy.initRandomSeed();
   arduboy.clear();
 
-  resetstage();
+  //startgame();  // For testing only
 }
 
 void loop() {
