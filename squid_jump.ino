@@ -31,6 +31,8 @@ int sprite = REGULAR;  // Default
 #define Y_ACCEL 0.1
 #define MAX_CHARGE 80
 
+#define CONVEYOR_SPEED 2
+
 float poisonheight = 128;
 #define LEEWAY 8
 #define POISON_SPEED 0.25
@@ -125,6 +127,7 @@ void gameinput() {
   }
   if (arduboy.justReleased(A_BUTTON)) {
     if (!player.falling && player.charge >= MAX_CHARGE / CHARGE_NUM) {
+      // player.xvelocity = 0; // True to original but less fun
       player.velocity = static_cast<float>(player.charge) / 20;
       player.falling = true;
 
@@ -149,18 +152,23 @@ void resetstage() {
   // Set up stage
   stage.totalplatforms = 16;
 
-  struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE };
+  struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE, REGULAR_PLATFORM, false, 0 };
   stage.platforms[0] = ground;
   int lastheight = HEIGHT - 2 * BLOCK_SIZE;
   for (int i = 1; i < stage.totalplatforms; i++) {
     int len = random(4, 8);
     int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
     int y = lastheight - random(5, 10) * BLOCK_SIZE;
-    int type = random(0, 3);
-      
-    int facingright = (type == JELLYFISH_PLATFORM) ? random(0, 2) : false;
+    int type = random(0, 4);
+    if (type == 3) {
+      type = 4;
+    }
 
-    stage.platforms[i] = { x, y, len, type, facingright };
+    bool facingright = (type == JELLYFISH_PLATFORM || type == CONVEYOR_PLATFORM) ? random(0, 2) : false;
+
+    byte sprite = 0;
+
+    stage.platforms[i] = { x, y, len, type, facingright, sprite };
     lastheight = y;
   }
 
@@ -214,12 +222,29 @@ void physics() {
   }
 
   // X
+  // Check for player push
+  if (!player.falling && stage.platforms[player.lastplatform].type == JELLYFISH_PLATFORM) {
+    if (stage.platforms[player.lastplatform].facingright) {
+      player.xvelocity = 1;
+    } else {
+      player.xvelocity = -1;
+    }
+  } else if (!player.falling && stage.platforms[player.lastplatform].type == CONVEYOR_PLATFORM) {
+    // if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
+    if (stage.platforms[player.lastplatform].facingright) {
+      player.xvelocity = 1.0 / CONVEYOR_SPEED;
+    } else {
+      player.xvelocity = -1.0 / CONVEYOR_SPEED;
+    }
+  }
+
+  // Velocity applied
   if (player.xvelocity > MAX_X_VELOCITY) {  // X Velocity Limits
     player.xvelocity = MAX_X_VELOCITY;
   } else if (player.xvelocity < -MAX_X_VELOCITY) {
     player.xvelocity = -MAX_X_VELOCITY;
   }
-  if (player.falling || stage.platforms[player.lastplatform].type == ICE_PLATFORM) {  // Set to 0 when on solid ground
+  if (player.falling || stage.platforms[player.lastplatform].type != REGULAR_PLATFORM) {  // Set to 0 when on solid ground
     player.x += player.xvelocity;
   } else {
     player.xvelocity = 0;
@@ -235,38 +260,46 @@ void physics() {
     player.xvelocity = 0;
   }
 
-  // Check for player push
-  if (!player.falling && stage.platforms[player.lastplatform].type == JELLYFISH_PLATFORM) {
-    if (stage.platforms[player.lastplatform].facingright) {
-      player.x++;
+// Boundaries
+if (player.intX() < 0) {
+  player.x = 0;
+} else if (player.intX() + PLAYER_SIZE > WIDTH) {
+  player.x = WIDTH - PLAYER_SIZE;
+}
+
+// Platform movement
+for (int k = 0; k < stage.totalplatforms; k++) {
+  if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
+    if (stage.platforms[k].facingright) {
+      stage.platforms[k].x++;
     } else {
-      player.x--;
+      stage.platforms[k].x--;
     }
-  }
+    stage.platforms[k].sprite = stage.platforms[k].facingright;
 
-  // Boundaries
-  if (player.intX() < 0) {
-    player.x = 0;
-  } else if (player.intX() + PLAYER_SIZE > WIDTH) {
-    player.x = WIDTH - PLAYER_SIZE;
-  }
-
-  // Platform movement
-  for (int k = 0; k < stage.totalplatforms; k++) {
-    if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
+    if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
+      stage.platforms[k].facingright = true;
+    } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
+      stage.platforms[k].facingright = false;
+    }
+  } else if (stage.platforms[k].type == CONVEYOR_PLATFORM) {
+    if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
       if (stage.platforms[k].facingright) {
-        stage.platforms[k].x++;
+        if (stage.platforms[k].sprite == 0) {
+          stage.platforms[k].sprite = 7;
+        } else {
+          stage.platforms[k].sprite--;
+        }
       } else {
-        stage.platforms[k].x--;
-      }
-
-      if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
-        stage.platforms[k].facingright = true;
-      } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
-        stage.platforms[k].facingright = false;
+        if (stage.platforms[k].sprite == 7) {
+          stage.platforms[k].sprite = 0;
+        } else {
+          stage.platforms[k].sprite++;
+        }
       }
     }
   }
+}
 }
 
 void poison() {
@@ -353,7 +386,7 @@ void drawgame() {
   for (int k = 0; k < stage.totalplatforms; k++) {
     if (!cull(stage.platforms[k])) {
       for (int i = 0; i < stage.platforms[k].len; i++) {
-        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].facingright);
+        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
       }
     }
   }
