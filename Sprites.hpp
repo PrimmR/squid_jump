@@ -267,6 +267,10 @@ const uint8_t PROGMEM Player_Mask[] = {
   0x30,
 };
 
+#define REGULAR_PLATFORM 0
+#define ICE_PLATFORM 1
+#define JELLYFISH_PLATFORM 2
+
 #define BLOCK_SIZE 8
 const uint8_t PROGMEM Block[] = {
   8,
@@ -291,6 +295,20 @@ const uint8_t PROGMEM Block[] = {
   0xd7,
   0xeb,
   0xff,
+
+  // Jellyfish L
+  0x1e,
+  0x5f,
+  0xbb,
+  0x5f,
+  0xbb,
+  0x5f,
+  0xbf,
+  0x1e,
+
+  // Jellyfish R
+
+  0x1e, 0xbf, 0x5f, 0xbb, 0x5f, 0xbb, 0x5f, 0x1e, 
 };
 
 const uint8_t PROGMEM Poison[] = {

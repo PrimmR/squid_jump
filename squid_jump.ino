@@ -156,8 +156,11 @@ void resetstage() {
     int len = random(4, 8);
     int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
     int y = lastheight - random(5, 10) * BLOCK_SIZE;
-    int type = random(0, 2);
-    stage.platforms[i] = { x, y, len, type };
+    int type = random(0, 3);
+      
+    int facingright = (type == JELLYFISH_PLATFORM) ? random(0, 2) : false;
+
+    stage.platforms[i] = { x, y, len, type, facingright };
     lastheight = y;
   }
 
@@ -210,16 +213,13 @@ void physics() {
     }
   }
 
-  // arduboy.print(player.falling);
-  // arduboy.print(player.lastplatform);
-
   // X
   if (player.xvelocity > MAX_X_VELOCITY) {  // X Velocity Limits
     player.xvelocity = MAX_X_VELOCITY;
   } else if (player.xvelocity < -MAX_X_VELOCITY) {
     player.xvelocity = -MAX_X_VELOCITY;
   }
-  if (player.falling || stage.platforms[player.lastplatform].type == 1) {  // Set to 0 when on solid ground
+  if (player.falling || stage.platforms[player.lastplatform].type == ICE_PLATFORM) {  // Set to 0 when on solid ground
     player.x += player.xvelocity;
   } else {
     player.xvelocity = 0;
@@ -235,6 +235,15 @@ void physics() {
     player.xvelocity = 0;
   }
 
+  // Check for player push
+  if (!player.falling && stage.platforms[player.lastplatform].type == JELLYFISH_PLATFORM) {
+    if (stage.platforms[player.lastplatform].facingright) {
+      player.x++;
+    } else {
+      player.x--;
+    }
+  }
+
   // Boundaries
   if (player.intX() < 0) {
     player.x = 0;
@@ -242,7 +251,22 @@ void physics() {
     player.x = WIDTH - PLAYER_SIZE;
   }
 
-  // arduboy.print(player.xvelocity);
+  // Platform movement
+  for (int k = 0; k < stage.totalplatforms; k++) {
+    if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
+      if (stage.platforms[k].facingright) {
+        stage.platforms[k].x++;
+      } else {
+        stage.platforms[k].x--;
+      }
+
+      if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
+        stage.platforms[k].facingright = true;
+      } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
+        stage.platforms[k].facingright = false;
+      }
+    }
+  }
 }
 
 void poison() {
@@ -329,7 +353,7 @@ void drawgame() {
   for (int k = 0; k < stage.totalplatforms; k++) {
     if (!cull(stage.platforms[k])) {
       for (int i = 0; i < stage.platforms[k].len; i++) {
-        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type);
+        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].facingright);
       }
     }
   }
@@ -398,9 +422,9 @@ void gamestatus() {
       Sprites::drawOverwrite((WIDTH - LIFE_SIZE) / 2 - (lives - 1) * (LIFE_SPACING / 2) + LIFE_SPACING * i, (HEIGHT - LIFE_SIZE) / 2, Life, 0);
     }
 
-      arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-      arduboy.print("LEVEL: ");
-      arduboy.print(stage.num);
+    arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+    arduboy.print("LEVEL: ");
+    arduboy.print(stage.num);
   } else {
     arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
     arduboy.print("SCORE: ");

@@ -20,6 +20,7 @@ struct Platform {
   int y;
   int len;
   int type;
+  bool facingright;
 };
 
 #define MAX_PLATFORMS 30  // 'Not in the mood' for dynamic lists
