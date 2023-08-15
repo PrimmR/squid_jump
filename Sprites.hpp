@@ -1562,12 +1562,16 @@ const uint8_t PROGMEM Star[] = {
 };
 
 #define STAR_WRAP 240
-#define NUM_STARS 22
+#define NUM_STARS 24
 const uint8_t PROGMEM stars[] = {
   // X, Y, type
   44,
   5,
   8,
+
+  28,
+  12,
+  4,
 
   19,
   16,
@@ -1593,6 +1597,10 @@ const uint8_t PROGMEM stars[] = {
   70,
   0,
 
+  32,
+  76,
+  6,
+
   4,
   80,
   5,
@@ -1617,7 +1625,6 @@ const uint8_t PROGMEM stars[] = {
   156,
   1,
 
-  
   42,
   160,
   2,
