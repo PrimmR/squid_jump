@@ -29,6 +29,7 @@ struct Stage {
   int num;
   struct Platform platforms[MAX_PLATFORMS];
   int totalplatforms;
+  uint16_t seed;
 };
 
 struct Zapfish {

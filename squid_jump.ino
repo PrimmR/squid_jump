@@ -11,6 +11,8 @@ ArduboyTones sound(arduboy.audio.enabled);
 #include "Sounds.hpp"
 #include "Sums.hpp"
 
+#include <limits.h>
+
 #define CHAR_WIDTH 6
 #define CHAR_HEIGHT 8
 
@@ -151,6 +153,8 @@ void gameinput() {
 void resetstage() {
   // Set up stage
   stage.totalplatforms = 16;
+  stage.seed = random(INT_MAX);
+  stage.seed = 0;
 
   struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE, REGULAR_PLATFORM, false, 0 };
   stage.platforms[0] = ground;
@@ -260,46 +264,46 @@ void physics() {
     player.xvelocity = 0;
   }
 
-// Boundaries
-if (player.intX() < 0) {
-  player.x = 0;
-} else if (player.intX() + PLAYER_SIZE > WIDTH) {
-  player.x = WIDTH - PLAYER_SIZE;
-}
+  // Boundaries
+  if (player.intX() < 0) {
+    player.x = 0;
+  } else if (player.intX() + PLAYER_SIZE > WIDTH) {
+    player.x = WIDTH - PLAYER_SIZE;
+  }
 
-// Platform movement
-for (int k = 0; k < stage.totalplatforms; k++) {
-  if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
-    if (stage.platforms[k].facingright) {
-      stage.platforms[k].x++;
-    } else {
-      stage.platforms[k].x--;
-    }
-    stage.platforms[k].sprite = stage.platforms[k].facingright;
-
-    if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
-      stage.platforms[k].facingright = true;
-    } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
-      stage.platforms[k].facingright = false;
-    }
-  } else if (stage.platforms[k].type == CONVEYOR_PLATFORM) {
-    if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
+  // Platform movement
+  for (int k = 0; k < stage.totalplatforms; k++) {
+    if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
       if (stage.platforms[k].facingright) {
-        if (stage.platforms[k].sprite == 0) {
-          stage.platforms[k].sprite = 7;
-        } else {
-          stage.platforms[k].sprite--;
-        }
+        stage.platforms[k].x++;
       } else {
-        if (stage.platforms[k].sprite == 7) {
-          stage.platforms[k].sprite = 0;
+        stage.platforms[k].x--;
+      }
+      stage.platforms[k].sprite = stage.platforms[k].facingright;
+
+      if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
+        stage.platforms[k].facingright = true;
+      } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
+        stage.platforms[k].facingright = false;
+      }
+    } else if (stage.platforms[k].type == CONVEYOR_PLATFORM) {
+      if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
+        if (stage.platforms[k].facingright) {
+          if (stage.platforms[k].sprite == 0) {
+            stage.platforms[k].sprite = 7;
+          } else {
+            stage.platforms[k].sprite--;
+          }
         } else {
-          stage.platforms[k].sprite++;
+          if (stage.platforms[k].sprite == 7) {
+            stage.platforms[k].sprite = 0;
+          } else {
+            stage.platforms[k].sprite++;
+          }
         }
       }
     }
   }
-}
 }
 
 void poison() {
@@ -381,7 +385,27 @@ bool cullzap(struct Zapfish zapfish) {
   return zapfish.y + camerapos + player.velocity > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
 }
 
+// bool cullstar(struct Zapfish zapfish) {
+//   return zapfish.y + camerapos + player.velocity > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
+// }
+
+uint16_t startype(int position, uint16_t seed) {
+  return hash(position, seed);  // Multiplied by chance for nothing
+}
+
 void drawgame() {
+  // Background
+  for (int y = 0; y <= HEIGHT / STAR_SIZE; y++) { // It works, don't question it
+    for (int x = 0; x <= WIDTH / STAR_SIZE; x++) {
+      int pos = toposition(x, y - camerapos / STAR_SIZE);
+      byte sprite = startype(pos, stage.seed);
+      if (sprite < NUM_STARS) {
+        Sprites::drawOverwrite(x * STAR_SIZE, y * STAR_SIZE + camerapos % STAR_SIZE, Star, sprite);
+      }
+    }
+  }
+
+
   // for (auto& plat : stage.platforms) {  // For every platform in platforms
   for (int k = 0; k < stage.totalplatforms; k++) {
     if (!cull(stage.platforms[k])) {
