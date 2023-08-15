@@ -6,8 +6,8 @@
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 
-#include "Sprites.hpp"
 #include "Structs.hpp"
+#include "Sprites.hpp"
 #include "Sounds.hpp"
 #include "Sums.hpp"
 
@@ -45,7 +45,7 @@ float poisonheight = 128;
 
 struct Player player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
 
-struct Stage stage = { 1, {}, 0 };
+struct Stage stage = { 1, {}, 0, 0 };
 
 struct Zapfish zapfish {
   0
@@ -153,8 +153,7 @@ void gameinput() {
 void resetstage() {
   // Set up stage
   stage.totalplatforms = 16;
-  stage.seed = random(INT_MAX);
-  stage.seed = 0;
+  stage.staroffset = random(STAR_WRAP);
 
   struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE, REGULAR_PLATFORM, false, 0 };
   stage.platforms[0] = ground;
@@ -385,57 +384,53 @@ bool cullzap(struct Zapfish zapfish) {
   return zapfish.y + camerapos + player.velocity > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
 }
 
-// bool cullstar(struct Zapfish zapfish) {
-//   return zapfish.y + camerapos + player.velocity > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
-// }
-
-uint16_t startype(int position, uint16_t seed) {
-  return hash(position, seed);  // Multiplied by chance for nothing
+bool cullstar(int y) {
+  return y > HEIGHT || y + STAR_SIZE < 0 || y - camerapos > 48;
 }
 
 void drawgame() {
   // Background
-  for (int y = 0; y <= HEIGHT / STAR_SIZE; y++) { // It works, don't question it
-    for (int x = 0; x <= WIDTH / STAR_SIZE; x++) {
-      int pos = toposition(x, y - camerapos / STAR_SIZE);
-      byte sprite = startype(pos, stage.seed);
-      if (sprite < NUM_STARS) {
-        Sprites::drawOverwrite(x * STAR_SIZE, y * STAR_SIZE + camerapos % STAR_SIZE, Star, sprite);
+  for (int k = 0; k < NUM_STARS; k++) {
+     struct Star star = { pgm_read_byte(&stars[k * 3]), pgm_read_byte(&stars[k * 3 + 1]), pgm_read_byte(&stars[k * 3 + 2]) }; // Messy but allows PROGMEM to be used
+    for (int i = 0; i <= 1; i++) {
+      int y = star.y + camerapos + stage.staroffset - STAR_WRAP * ((camerapos + stage.staroffset) / STAR_WRAP + i);
+      if (!cullstar(y)) {
+        Sprites::drawOverwrite(star.x * 2, y, Star, star.type);
       }
     }
   }
 
 
-  // for (auto& plat : stage.platforms) {  // For every platform in platforms
-  for (int k = 0; k < stage.totalplatforms; k++) {
-    if (!cull(stage.platforms[k])) {
-      for (int i = 0; i < stage.platforms[k].len; i++) {
-        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
-      }
+// for (auto& plat : stage.platforms) {  // For every platform in platforms
+for (int k = 0; k < stage.totalplatforms; k++) {
+  if (!cull(stage.platforms[k])) {
+    for (int i = 0; i < stage.platforms[k].len; i++) {
+      Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
     }
   }
+}
 
-  if (!cullzap(zapfish)) {
-    Sprites::drawOverwrite((WIDTH - ZAP_SIZE) / 2, zapfish.y + camerapos, Zap, 0);
-  }
+if (!cullzap(zapfish)) {
+  Sprites::drawOverwrite((WIDTH - ZAP_SIZE) / 2, zapfish.y + camerapos, Zap, 0);
+}
 
-  if (poisonheight + camerapos <= HEIGHT) {
-    Sprites::drawSelfMasked(0, poisonheight + camerapos, Poison, 0);
-  }
+if (poisonheight + camerapos <= HEIGHT) {
+  Sprites::drawSelfMasked(0, poisonheight + camerapos, Poison, 0);
+}
 
-  if (player.charge == MAX_CHARGE) {
-    sprite = CHARGE_4;
-  } else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 2) {
-    sprite = CHARGE_3;
-  } else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 1) {
-    sprite = CHARGE_2;
-  } else {
-    sprite = REGULAR;
-  }
+if (player.charge == MAX_CHARGE) {
+  sprite = CHARGE_4;
+} else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 2) {
+  sprite = CHARGE_3;
+} else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 1) {
+  sprite = CHARGE_2;
+} else {
+  sprite = REGULAR;
+}
 
 
-  // Draw player
-  Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
+// Draw player
+Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
 }
 
 void gameplay() {
