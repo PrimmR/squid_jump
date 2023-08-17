@@ -31,7 +31,7 @@ int sprite = REGULAR;  // Default
 #define X_ACCEL 0.1
 #define MAX_Y_VELOCITY 12
 #define Y_ACCEL 0.1
-#define MAX_CHARGE 80
+#define MAX_CHARGE 64
 
 #define CONVEYOR_SPEED 2
 
@@ -39,13 +39,25 @@ float poisonheight = 128;
 #define LEEWAY 8
 #define POISON_SPEED 0.25
 
-#define ZAP_UP 86
+#define ZAP_UP 84
 
 #define LIFE_SPACING 10
 
-struct Player player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
+struct Player player = {
+  (WIDTH - PLAYER_SIZE) / 2,
+  HEIGHT / 2,
+  0,
+  0,
+  true,
+  0,
+  0,
+  0,
+  0,
+  false,
+  1
+};
 
-struct Stage stage = { 1, {}, 0, 0 };
+struct Stage stage = { 1, {}, 0, {}, 0, 0 };
 
 struct Zapfish zapfish {
   0
@@ -124,18 +136,28 @@ void gameinput() {
   }
   if (arduboy.pressed(A_BUTTON)) {
     if (player.charge < MAX_CHARGE) {
-      player.charge++;
+      player.charge += player.velocitymod * ((player.powerupstate == POWERUP_JELLY || player.powerupstate == POWERUP_STAR) ? 1.5 : 1.0);  // Slightly too hardcoded but oh
+    } else if (player.charge > MAX_CHARGE) {
+      player.charge = MAX_CHARGE;
     }
   }
   if (arduboy.justReleased(A_BUTTON)) {
-    if (!player.falling && player.charge >= MAX_CHARGE / CHARGE_NUM) {
-      // player.xvelocity = 0; // True to original but less fun
-      player.velocity = static_cast<float>(player.charge) / 20;
-      player.falling = true;
+    if (player.charge >= MAX_CHARGE / CHARGE_NUM) {
+      if (!player.falling) {
+        // player.xvelocity = 0; // True to original but less fun
+        player.velocity = 4.0 * player.charge / MAX_CHARGE;
+        player.falling = true;
 
-      sound.tones(jump_sound);
+        sound.tones(jump_sound);
+      } else if (player.powerupstate == POWERUP_JELLY && player.jumpcharge) {  // Midair Jump
+        player.jumpcharge = false;
+        player.velocity = 4.0 * player.charge / MAX_CHARGE;
+        player.falling = true;
+
+        sound.tones(jump_sound);
+      }
+      player.charge = 0;
     }
-    player.charge = 0;
   }
 
   if (arduboy.justPressed(B_BUTTON)) {
@@ -175,12 +197,39 @@ void resetstage() {
     lastheight = y;
   }
 
+  stage.totalpowerups = 6;
+
+  // Chooses space between platforms
+  for (int i = 0; i < stage.totalpowerups; i++) {
+    int aboveplatform = random(1, stage.totalplatforms - 1);  // Won't choose the top or bottom one
+    int y = random(stage.platforms[aboveplatform + 1].y + BLOCK_SIZE, stage.platforms[aboveplatform].y - POWERUP_SIZE);
+
+    int x = random(WIDTH - POWERUP_SIZE);
+    byte type = random(3);
+
+    // Reroll overlapping powerups
+    bool nocollisions = true;
+    for (int k = 0; k < i; k++) {
+      if (x + POWERUP_SIZE >= stage.powerups[k].x && x <= stage.powerups[k].x + POWERUP_SIZE && y + POWERUP_SIZE >= stage.powerups[k].y && y <= stage.powerups[k].y + POWERUP_SIZE) {
+        nocollisions = false;
+      }
+    }
+
+    if (nocollisions) {
+      stage.powerups[i] = { x, y, type };
+    } else {
+      i--;  // Reroll
+    }
+  }
+
+
   zapfish = { lastheight - ZAP_UP - ZAP_SIZE };
 
   // Reset states
-  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0 };
+  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0, 0, 0, false, 1 };
   camerapos = 0;
   poisonheight = 128;
+  currentstagetimer = 0;
 }
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
@@ -195,11 +244,17 @@ bool collision(Platform platform, int height) {  // Assume that it's always call
   return false;
 }
 
+bool powerupcollision(struct Powerup powerup) {
+  Rect playerbox = Rect(player.intX(), player.intY() + camerapos, PLAYER_SIZE, PLAYER_SIZE);
+  Rect powerupbox = Rect(powerup.x, powerup.y + camerapos, POWERUP_SIZE, POWERUP_SIZE);
+  return Arduboy2::collide(playerbox, powerupbox);
+}
+
 void physics() {
   // Y
   if (player.falling) {
-    player.y -= player.velocity;
-    player.velocity -= Y_ACCEL;
+    player.y -= player.velocity * player.velocitymod;
+    player.velocity -= Y_ACCEL * player.velocitymod;
   } else {
     player.velocity = 0;
   }
@@ -211,9 +266,10 @@ void physics() {
   for (int i = 0; i < stage.totalplatforms; i++) {
     if (player.falling) {
       if (!cull(stage.platforms[i])) {
-        if (collision(stage.platforms[i], -ceil(player.velocity))) {
+        if (collision(stage.platforms[i], -ceil(player.velocity * player.velocitymod))) {
           player.y = stage.platforms[i].y - PLAYER_SIZE;
           player.falling = false;
+          player.jumpcharge = true;
           player.lastplatform = i;
         }
       }
@@ -330,6 +386,45 @@ void zap() {
   }
 }
 
+void powerups() {
+  for (int i = 0; i < stage.totalpowerups; i++) {
+    if (!cullpup(stage.powerups[i]) && powerupcollision(stage.powerups[i]) && !stage.powerups[i].hidden) {
+      stage.powerups[i].hidden = true;
+      sound.tones(powerup_sound);
+
+      switch (stage.powerups[i].type) {
+        case POWERUP_FISH:
+          player.velocity = 6;
+          player.falling = true;
+          break;
+
+        case POWERUP_JELLY:
+          player.poweruptimer = POWERUP_TIME;
+          player.powerupstate = stage.powerups[i].type;
+          player.velocitymod = 1;
+          break;
+
+        case POWERUP_STAR:
+          player.poweruptimer = POWERUP_TIME;
+          player.powerupstate = stage.powerups[i].type;
+          player.velocitymod = 1.5;
+          break;
+      }
+    }
+  }
+
+  if (player.poweruptimer > 0) {
+    player.poweruptimer--;
+  } else {
+    if (player.powerupstate == POWERUP_STAR && player.velocity > 0 && player.falling) {
+      player.velocity = 6;
+    }
+
+    player.powerupstate = 0;
+    player.velocitymod = 1;
+  }
+}
+
 void nextlevel() {
   int timemodifier;
   if (stage.num < 11) {
@@ -377,11 +472,15 @@ void movecamera() {
 }
 
 bool cull(struct Platform platform) {
-  return platform.y + camerapos + player.velocity > HEIGHT || platform.y + camerapos + BLOCK_SIZE < 0;
+  return platform.y + camerapos + player.velocity * player.velocitymod > HEIGHT || platform.y + camerapos + BLOCK_SIZE < 0;
+}
+
+bool cullpup(struct Powerup powerup) {
+  return powerup.y + camerapos + player.velocity * player.velocitymod > HEIGHT || powerup.y + camerapos + POWERUP_SIZE < 0;
 }
 
 bool cullzap(struct Zapfish zapfish) {
-  return zapfish.y + camerapos + player.velocity > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
+  return zapfish.y + camerapos + player.velocity * player.velocitymod > HEIGHT || zapfish.y + camerapos + ZAP_SIZE < 0;
 }
 
 bool cullstar(int y) {
@@ -391,7 +490,7 @@ bool cullstar(int y) {
 void drawgame() {
   // Background
   for (int k = 0; k < NUM_STARS; k++) {
-     struct Star star = { pgm_read_byte(&stars[k * 3]), pgm_read_byte(&stars[k * 3 + 1]), pgm_read_byte(&stars[k * 3 + 2]) }; // Messy but allows PROGMEM to be used
+    struct Star star = { pgm_read_byte(&stars[k * 3]), pgm_read_byte(&stars[k * 3 + 1]), pgm_read_byte(&stars[k * 3 + 2]) };  // Messy but allows PROGMEM to be used
     for (int i = 0; i <= 1; i++) {
       int y = star.y + camerapos + stage.staroffset - STAR_WRAP * ((camerapos + stage.staroffset) / STAR_WRAP + i);
       if (!cullstar(y)) {
@@ -400,37 +499,46 @@ void drawgame() {
     }
   }
 
-
-// for (auto& plat : stage.platforms) {  // For every platform in platforms
-for (int k = 0; k < stage.totalplatforms; k++) {
-  if (!cull(stage.platforms[k])) {
-    for (int i = 0; i < stage.platforms[k].len; i++) {
-      Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
+  // for (auto& plat : stage.platforms) {  // For every platform in platforms
+  for (int k = 0; k < stage.totalplatforms; k++) {
+    if (!cull(stage.platforms[k])) {
+      for (int i = 0; i < stage.platforms[k].len; i++) {
+        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
+      }
     }
   }
-}
 
-if (!cullzap(zapfish)) {
-  Sprites::drawOverwrite((WIDTH - ZAP_SIZE) / 2, zapfish.y + camerapos, Zap, 0);
-}
+  for (int i = 0; i < stage.totalpowerups; i++) {
+    if (!cullpup(stage.powerups[i]) && !stage.powerups[i].hidden) {
+      Sprites::drawExternalMask(stage.powerups[i].x, stage.powerups[i].y + camerapos, Powerup, Powerup_Mask, stage.powerups[i].type, stage.powerups[i].type);
+    }
+  }
 
-if (poisonheight + camerapos <= HEIGHT) {
-  Sprites::drawSelfMasked(0, poisonheight + camerapos, Poison, 0);
-}
+  if (!cullzap(zapfish)) {
+    Sprites::drawOverwrite((WIDTH - ZAP_SIZE) / 2, zapfish.y + camerapos, Zap, 0);
+  }
 
-if (player.charge == MAX_CHARGE) {
-  sprite = CHARGE_4;
-} else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 2) {
-  sprite = CHARGE_3;
-} else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 1) {
-  sprite = CHARGE_2;
-} else {
-  sprite = REGULAR;
-}
+  if (poisonheight + camerapos <= HEIGHT) {
+    Sprites::drawSelfMasked(0, poisonheight + camerapos, Poison, 0);
+  }
+
+  if (player.charge >= MAX_CHARGE) {
+    sprite = CHARGE_4;
+  } else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 2) {
+    sprite = CHARGE_3;
+  } else if (player.charge >= MAX_CHARGE / CHARGE_NUM * 1) {
+    sprite = CHARGE_2;
+  } else {
+    sprite = REGULAR;
+  }
 
 
-// Draw player
-Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
+  // Draw player
+  Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
+
+  if (player.powerupstate == 1 || player.powerupstate == 2) {
+    Sprites::drawSelfMasked(player.x - 1, player.y - 1 + camerapos, Sparkle, (arduboy.frameCount % 20) / 10);
+  }
 }
 
 void gameplay() {
@@ -439,6 +547,7 @@ void gameplay() {
   gameinput();
   poison();
   zap();
+  powerups();
   physics();
   movecamera();
   if (gamestate == GAME_PLAY) {  // Prevents flashes when going to status screen
@@ -498,10 +607,6 @@ void gamestatus() {
 
 
   if (statustimer <= 0) {
-    if (status != MISS) {  // Reset timer unless MISS
-      currentstagetimer = 0;
-    }
-
     arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
     gamestate = GAME_PLAY;
 
