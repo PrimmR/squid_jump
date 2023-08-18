@@ -10,6 +10,7 @@ ArduboyTones sound(arduboy.audio.enabled);
 #include "Sprites.hpp"
 #include "Sounds.hpp"
 #include "Sums.hpp"
+#include "Saves.hpp"
 
 #include <limits.h>
 
@@ -370,6 +371,7 @@ void poison() {
       resetstage();
       setupstatus(MISS);
     } else {
+      updatetops();
       gamestate = GAME_OVER;
       showtextblink = true;
     }
@@ -555,6 +557,22 @@ void gameplay() {
   }
 }
 
+void updatetops() {
+  bool saveneeded = false;
+  if (stage.num > toplevel) {
+    toplevel = stage.num;
+    saveneeded = true;
+  }
+  if (score > topscore) {
+    topscore = score;
+    saveneeded = true;
+  }
+
+  if (saveneeded) {
+    saveEEPROM();
+  }
+}
+
 void setupstatus(int event) {
   status = event;
   statustimer = 240;
@@ -672,6 +690,7 @@ void setup() {
   arduboy.initRandomSeed();
   arduboy.clear();
 
+  initEEPROM();
   //startgame();  // For testing only
 }
 
