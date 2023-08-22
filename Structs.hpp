@@ -20,15 +20,20 @@ struct Player {
 };
 
 struct Platform {
-  int x;
+  float x;
   int y;
   int len;
   int type;
   bool facingright;
   byte sprite;
+
+  int intX() {
+    return floor(x);
+  }
 };
 
 #define POWERUP_TIME 660
+#define MAX_POWERUPS 6
 struct Powerup {
   int x;
   int y;
@@ -42,8 +47,7 @@ struct Star {
   byte type;
 };
 
-#define MAX_PLATFORMS 30  // 'Not in the mood' for dynamic lists
-#define MAX_POWERUPS 8
+#define MAX_PLATFORMS 28  // 'Not in the mood' for dynamic lists
 struct Stage {
   int num;
   struct Platform platforms[MAX_PLATFORMS];
@@ -51,6 +55,7 @@ struct Stage {
   struct Powerup powerups[MAX_POWERUPS];
   int totalpowerups;
   byte staroffset;
+  byte speed;
 };
 
 struct Zapfish {

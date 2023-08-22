@@ -34,8 +34,6 @@ int sprite = REGULAR;  // Default
 #define Y_ACCEL 0.1
 #define MAX_CHARGE 64
 
-#define CONVEYOR_SPEED 2
-
 float poisonheight = 128;
 #define LEEWAY 8
 #define POISON_SPEED 0.25
@@ -58,7 +56,7 @@ struct Player player = {
   1
 };
 
-struct Stage stage = { 1, {}, 0, {}, 0, 0 };
+struct Stage stage = { 1, {}, 0, {}, 0, 0, 2 };
 
 struct Zapfish zapfish {
   0
@@ -89,6 +87,7 @@ bool showtextblink = true;
 
 
 // FUNCTIONS
+#include "Stages.hpp"
 
 
 void titlescreen() {
@@ -130,10 +129,14 @@ void startgame() {
 
 void gameinput() {
   if (arduboy.pressed(LEFT_BUTTON) && player.falling) {
-    player.xvelocity -= X_ACCEL + X_VELOCITY_DECAY;
+    if (player.xvelocity > -MAX_X_VELOCITY) {
+      player.xvelocity -= (X_ACCEL + X_VELOCITY_DECAY) * player.velocitymod * ((player.powerupstate == POWERUP_STAR) ? 1.5 : 1.0) ;
+    }
   }
   if (arduboy.pressed(RIGHT_BUTTON) && player.falling) {
-    player.xvelocity += X_ACCEL + X_VELOCITY_DECAY;
+    if (player.xvelocity < MAX_X_VELOCITY) {
+      player.xvelocity += (X_ACCEL + X_VELOCITY_DECAY) * player.velocitymod * ((player.powerupstate == POWERUP_STAR) ? 1.5 : 1.0);
+    }
   }
   if (arduboy.pressed(A_BUTTON)) {
     if (player.charge < MAX_CHARGE) {
@@ -144,21 +147,24 @@ void gameinput() {
   }
   if (arduboy.justReleased(A_BUTTON)) {
     if (player.charge >= MAX_CHARGE / CHARGE_NUM) {
-      if (!player.falling) {
-        // player.xvelocity = 0; // True to original but less fun
-        player.velocity = 4.0 * player.charge / MAX_CHARGE;
-        player.falling = true;
+      float newvelocity = 4.0 * player.charge / MAX_CHARGE;
+      if (newvelocity > player.velocity) {
+        if (!player.falling) {
+          // player.xvelocity = 0; // True to original but less fun
+          player.velocity = newvelocity;
+          player.falling = true;
 
-        sound.tones(jump_sound);
-      } else if (player.powerupstate == POWERUP_JELLY && player.jumpcharge) {  // Midair Jump
-        player.jumpcharge = false;
-        player.velocity = 4.0 * player.charge / MAX_CHARGE;
-        player.falling = true;
+          sound.tones(jump_sound);
+        } else if (player.powerupstate == POWERUP_JELLY && player.jumpcharge) {  // Midair Jump
+          player.jumpcharge = false;
+          player.velocity = newvelocity;
+          player.falling = true;
 
-        sound.tones(jump_sound);
+          sound.tones(jump_sound);
+        }
       }
-      player.charge = 0;
     }
+    player.charge = 0;
   }
 
   if (arduboy.justPressed(B_BUTTON)) {
@@ -166,71 +172,15 @@ void gameinput() {
       lives++;
     } else if (arduboy.pressed(DOWN_BUTTON)) {
       lives--;
+    } else if (arduboy.pressed(LEFT_BUTTON)) {
+      stage.num--;
+    } else if (arduboy.pressed(RIGHT_BUTTON)) {
+      stage.num++;
     }
   }
 
   // arduboy.print(player.charge);
   // arduboy.print(" ");
-}
-
-void resetstage() {
-  // Set up stage
-  stage.totalplatforms = 16;
-  stage.staroffset = random(STAR_WRAP);
-
-  struct Platform ground = { 0, HEIGHT - 2 * BLOCK_SIZE, WIDTH / BLOCK_SIZE, REGULAR_PLATFORM, false, 0 };
-  stage.platforms[0] = ground;
-  int lastheight = HEIGHT - 2 * BLOCK_SIZE;
-  for (int i = 1; i < stage.totalplatforms; i++) {
-    int len = random(4, 8);
-    int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
-    int y = lastheight - random(5, 10) * BLOCK_SIZE;
-    int type = random(0, 4);
-    if (type == 3) {
-      type = 4;
-    }
-
-    bool facingright = (type == JELLYFISH_PLATFORM || type == CONVEYOR_PLATFORM) ? random(0, 2) : false;
-
-    byte sprite = 0;
-
-    stage.platforms[i] = { x, y, len, type, facingright, sprite };
-    lastheight = y;
-  }
-
-  stage.totalpowerups = 6;
-
-  // Chooses space between platforms
-  for (int i = 0; i < stage.totalpowerups; i++) {
-    int aboveplatform = random(1, stage.totalplatforms - 1);  // Won't choose the top or bottom one
-    int y = random(stage.platforms[aboveplatform + 1].y + BLOCK_SIZE, stage.platforms[aboveplatform].y - POWERUP_SIZE);
-
-    int x = random(WIDTH - POWERUP_SIZE);
-    byte type = random(3);
-
-    // Reroll overlapping powerups
-    bool nocollisions = true;
-    for (int k = 0; k < i; k++) {
-      if (x + POWERUP_SIZE >= stage.powerups[k].x && x <= stage.powerups[k].x + POWERUP_SIZE && y + POWERUP_SIZE >= stage.powerups[k].y && y <= stage.powerups[k].y + POWERUP_SIZE) {
-        nocollisions = false;
-      }
-    }
-
-    if (nocollisions) {
-      stage.powerups[i] = { x, y, type };
-    } else {
-      i--;  // Reroll
-    }
-  }
-
-
-  zapfish = { lastheight - ZAP_UP - ZAP_SIZE };
-
-  // Reset states
-  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0, 0, 0, false, 1 };
-  camerapos = 0;
-  poisonheight = 128;
-  currentstagetimer = 0;
 }
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
@@ -285,25 +235,20 @@ void physics() {
   // Check for player push
   if (!player.falling && stage.platforms[player.lastplatform].type == JELLYFISH_PLATFORM) {
     if (stage.platforms[player.lastplatform].facingright) {
-      player.xvelocity = 1;
+      player.xvelocity = stage.speed / 2.0;
     } else {
-      player.xvelocity = -1;
+      player.xvelocity = -stage.speed / 2.0;
     }
   } else if (!player.falling && stage.platforms[player.lastplatform].type == CONVEYOR_PLATFORM) {
     // if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
     if (stage.platforms[player.lastplatform].facingright) {
-      player.xvelocity = 1.0 / CONVEYOR_SPEED;
+      player.xvelocity = 1.0 / (5 - stage.speed);
     } else {
-      player.xvelocity = -1.0 / CONVEYOR_SPEED;
+      player.xvelocity = -1.0 / (5 - stage.speed);
     }
   }
 
   // Velocity applied
-  if (player.xvelocity > MAX_X_VELOCITY) {  // X Velocity Limits
-    player.xvelocity = MAX_X_VELOCITY;
-  } else if (player.xvelocity < -MAX_X_VELOCITY) {
-    player.xvelocity = -MAX_X_VELOCITY;
-  }
   if (player.falling || stage.platforms[player.lastplatform].type != REGULAR_PLATFORM) {  // Set to 0 when on solid ground
     player.x += player.xvelocity;
   } else {
@@ -331,19 +276,19 @@ void physics() {
   for (int k = 0; k < stage.totalplatforms; k++) {
     if (stage.platforms[k].type == JELLYFISH_PLATFORM) {
       if (stage.platforms[k].facingright) {
-        stage.platforms[k].x++;
+        stage.platforms[k].x += stage.speed / 2.0;
       } else {
-        stage.platforms[k].x--;
+        stage.platforms[k].x -= stage.speed / 2.0;
       }
       stage.platforms[k].sprite = stage.platforms[k].facingright;
 
-      if (stage.platforms[k].x < 0 + BLOCK_SIZE) {
+      if (stage.platforms[k].intX() < 0 + BLOCK_SIZE) {
         stage.platforms[k].facingright = true;
-      } else if (stage.platforms[k].x + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
+      } else if (stage.platforms[k].intX() + stage.platforms[k].len * BLOCK_SIZE > WIDTH - BLOCK_SIZE) {
         stage.platforms[k].facingright = false;
       }
     } else if (stage.platforms[k].type == CONVEYOR_PLATFORM) {
-      if (arduboy.frameCount % CONVEYOR_SPEED == 0) {
+      if (arduboy.frameCount % (5 - stage.speed) == 0) {
         if (stage.platforms[k].facingright) {
           if (stage.platforms[k].sprite == 0) {
             stage.platforms[k].sprite = 7;
@@ -396,8 +341,9 @@ void powerups() {
 
       switch (stage.powerups[i].type) {
         case POWERUP_FISH:
-          player.velocity = 6;
+          player.velocity = 5.5;
           player.falling = true;
+          player.jumpcharge = true;
           break;
 
         case POWERUP_JELLY:
@@ -505,7 +451,7 @@ void drawgame() {
   for (int k = 0; k < stage.totalplatforms; k++) {
     if (!cull(stage.platforms[k])) {
       for (int i = 0; i < stage.platforms[k].len; i++) {
-        Sprites::drawOverwrite(stage.platforms[k].x + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
+        Sprites::drawOverwrite(stage.platforms[k].intX() + i * BLOCK_SIZE, stage.platforms[k].y + camerapos, Block, stage.platforms[k].type + stage.platforms[k].sprite);
       }
     }
   }
@@ -538,7 +484,7 @@ void drawgame() {
   // Draw player
   Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
 
-  if (player.powerupstate == 1 || player.powerupstate == 2) {
+  if (player.powerupstate == POWERUP_JELLY || player.powerupstate == POWERUP_STAR) {
     Sprites::drawSelfMasked(player.x - 1, player.y - 1 + camerapos, Sparkle, (arduboy.frameCount % 20) / 10);
   }
 }
@@ -641,22 +587,10 @@ void gameoverscreen() {
   arduboy.print("SCORE: ");
   arduboy.print(score);
 
+  arduboy.setCursor(WIDTH / 2 - 9 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  arduboy.print("HI SCORE: ");
+  arduboy.print(topscore);
 
-
-  arduboy.setCursor((WIDTH - 19 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("PRESS");
-
-  if (showtextblink) {
-    arduboy.print(" A ");
-  }
-
-  arduboy.setCursor((WIDTH - 3 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("TO CONTINUE");
-
-
-  if (arduboy.everyXFrames(30)) {
-    showtextblink = !showtextblink;
-  }
 
   if (arduboy.justPressed(A_BUTTON)) {
     gamestate = GAME_TITLE;
