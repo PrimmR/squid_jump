@@ -337,6 +337,10 @@ void build_powerups() {  //Requires platforms to be built first
 
 
 void resetstage() {  // Either decrease powerups, or increase len
+  if (stage.num > 25) {
+    stage.num = 25;
+  }
+
   stage.staroffset = random(STAR_WRAP);
 
   if (stage.num >= 18) {
@@ -353,7 +357,7 @@ void resetstage() {  // Either decrease powerups, or increase len
   build_powerups();
 
   // Reset states
-  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT / 2, 0, 0, true, 0, 0, 0, 0, false, 1 };
+  player = { (WIDTH - PLAYER_SIZE) / 2, HEIGHT - 2 * BLOCK_SIZE - PLAYER_SIZE, 0, 0, true, 0, 0, 0, 0, false, 1 };
   camerapos = 0;
   poisonheight = 128;
   currentstagetimer = 0;

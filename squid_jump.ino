@@ -20,8 +20,9 @@ ArduboyTones sound(arduboy.audio.enabled);
 // Game states
 #define GAME_TITLE 0
 #define GAME_PLAY 1
-#define GAME_OVER 2
+// #define GAME_OVER 2
 #define GAME_STATUS 3
+// #define GAME_CONGRATS 4
 int gamestate = GAME_TITLE;
 
 // Graphics
@@ -44,7 +45,7 @@ float poisonheight = 128;
 
 struct Player player = {
   (WIDTH - PLAYER_SIZE) / 2,
-  HEIGHT / 2,
+  HEIGHT - 2 * BLOCK_SIZE - PLAYER_SIZE,
   0,
   0,
   true,
@@ -77,9 +78,12 @@ int timebonus = 0;
 #define MISS 0
 #define GOAL 1
 #define START 2
+#define GAMEOVER 3
+#define CONGRATS 4
 int status = 0;
 int statustimer = 0;
 int statustimermax = 0;
+bool proceedwithA = false;
 
 uint16_t currentstagetimer = 0;
 
@@ -88,6 +92,7 @@ bool showtextblink = true;
 
 // FUNCTIONS
 #include "Stages.hpp"
+#include "Status.hpp"
 
 
 void titlescreen() {
@@ -130,7 +135,7 @@ void startgame() {
 void gameinput() {
   if (arduboy.pressed(LEFT_BUTTON) && player.falling) {
     if (player.xvelocity > -MAX_X_VELOCITY) {
-      player.xvelocity -= (X_ACCEL + X_VELOCITY_DECAY) * player.velocitymod * ((player.powerupstate == POWERUP_STAR) ? 1.5 : 1.0) ;
+      player.xvelocity -= (X_ACCEL + X_VELOCITY_DECAY) * player.velocitymod * ((player.powerupstate == POWERUP_STAR) ? 1.5 : 1.0);
     }
   }
   if (arduboy.pressed(RIGHT_BUTTON) && player.falling) {
@@ -317,8 +322,7 @@ void poison() {
       setupstatus(MISS);
     } else {
       updatetops();
-      gamestate = GAME_OVER;
-      showtextblink = true;
+      setupstatus(GAMEOVER);
     }
   }
 }
@@ -403,8 +407,13 @@ void nextlevel() {
   }
 
   stage.num++;
-  resetstage();
-  setupstatus(GOAL);
+  if (stage.num <= 25) {
+    resetstage();
+    setupstatus(GOAL);
+  } else {
+    updatetops();
+    setupstatus(CONGRATS);
+  }
 }
 
 void movecamera() {
@@ -519,84 +528,6 @@ void updatetops() {
   }
 }
 
-void setupstatus(int event) {
-  status = event;
-  statustimer = 240;
-  statustimermax = 240;
-  gamestate = GAME_STATUS;
-}
-
-void gamestatus() {
-  if (status == MISS) {
-    arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("MISS");
-  } else if (status == GOAL) {
-    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("GOAL");
-  } else if (status == START) {
-    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 3 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("START!");
-  }
-
-  if (statustimer <= statustimermax / 2 || status != GOAL) {
-    for (int i = 0; i < lives; i++) {  // Draw lives
-      // ((WIDTH - LIFE_SIZE - (lives-1) * LIFE_SPACING) / 2) + LIFE_SPACING * i)
-      Sprites::drawOverwrite((WIDTH - LIFE_SIZE) / 2 - (lives - 1) * (LIFE_SPACING / 2) + LIFE_SPACING * i, (HEIGHT - LIFE_SIZE) / 2, Life, 0);
-    }
-
-    arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-    arduboy.print("LEVEL: ");
-    arduboy.print(stage.num);
-  } else {
-    arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-    arduboy.print("SCORE: ");
-    arduboy.print(score);
-
-    if (status == GOAL) {
-      arduboy.setCursor(WIDTH / 2 - 24 - (GetNumberOfDigits(stagebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
-      arduboy.print("+");
-      arduboy.print(stagebonus);
-      arduboy.setCursor(WIDTH / 2 + 24 - (GetNumberOfDigits(timebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
-      arduboy.print("+");
-      arduboy.print(timebonus);
-    }
-  }
-
-  if (arduboy.justPressed(A_BUTTON)) {  // Just for testing?
-    statustimer = 0;
-  }
-
-
-  if (statustimer <= 0) {
-    arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
-    gamestate = GAME_PLAY;
-
-  } else {
-    statustimer--;
-  }
-}
-
-void gameoverscreen() {
-  arduboy.setCursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-  arduboy.print("GAME OVER!");
-
-  arduboy.setCursor(WIDTH / 2 - 6 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
-  arduboy.print("SCORE: ");
-  arduboy.print(score);
-
-  arduboy.setCursor(WIDTH / 2 - 9 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("HI SCORE: ");
-  arduboy.print(topscore);
-
-
-  if (arduboy.justPressed(A_BUTTON)) {
-    gamestate = GAME_TITLE;
-  }
-}
-
 void gameloop() {
   switch (gamestate) {
     case GAME_TITLE:
@@ -609,10 +540,6 @@ void gameloop() {
 
     case GAME_STATUS:
       gamestatus();
-      break;
-
-    case GAME_OVER:
-      gameoverscreen();
       break;
   }
 }
