@@ -5,3 +5,5 @@ unsigned GetNumberOfDigits(unsigned i) {
 int ScoreFromFrames(uint16_t frames, int modifier) {
   return modifier * (1200 - frames / 2);
 }
+
+#define LEVELPOS(level) ((level) * 5 + 1)

@@ -4,32 +4,32 @@ void drawlivesandlevel() {
     Sprites::drawOverwrite((WIDTH - LIFE_SIZE) / 2 - (lives - 1) * (LIFE_SPACING / 2) + LIFE_SPACING * i, (HEIGHT - LIFE_SIZE) / 2, Life, 0);
   }
 
-  arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("LEVEL: ");
-  arduboy.print(stage.num);
+  setcursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  squidprint("LEVEL: ");
+  squidprint(stage.num);
 }
 
 void drawpoints() {
-  arduboy.setCursor(WIDTH / 2 - 24 - (GetNumberOfDigits(stagebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
-  arduboy.print("+");
-  arduboy.print(stagebonus);
-  arduboy.setCursor(WIDTH / 2 + 24 - (GetNumberOfDigits(timebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
-  arduboy.print("+");
-  arduboy.print(timebonus);
+  setcursor(WIDTH / 2 - 24 - (GetNumberOfDigits(stagebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
+  squidprint("+");
+  squidprint(stagebonus);
+  setcursor(WIDTH / 2 + 24 - (GetNumberOfDigits(timebonus) + 1) * CHAR_WIDTH / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
+  squidprint("+");
+  squidprint(timebonus);
 
-  arduboy.setCursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("SCORE: ");
-  arduboy.print(score);
+  setcursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  squidprint("SCORE: ");
+  squidprint(score);
 }
 
 void drawhighscore() {
-  arduboy.setCursor(WIDTH / 2 - 6 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
-  arduboy.print("SCORE: ");
-  arduboy.print(score);
+  setcursor(WIDTH / 2 - 6 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
+  squidprint("SCORE: ");
+  squidprint(score);
 
-  arduboy.setCursor(WIDTH / 2 - 9 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("HI SCORE: ");
-  arduboy.print(topscore);
+  setcursor(WIDTH / 2 - 9 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  squidprint("HI SCORE: ");
+  squidprint(topscore);
 }
 
 
@@ -48,25 +48,35 @@ void setupstatus(int event) {
 
 void gamestatus() {
   if (status == MISS) {
-    arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("MISS");
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_OFF);
+    }
+    setcursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    squidprint("MISS");
   } else if (status == GOAL) {
-    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("GOAL");
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
+    }
+    setcursor(WIDTH / 2 - 2 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    squidprint("GOAL");
   } else if (status == START) {
-    arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 3 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("START!");
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
+    }
+    setcursor(WIDTH / 2 - 3 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    squidprint("START!");
   } else if (status == GAMEOVER) {
-    arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_ON);
-    arduboy.setCursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("GAME OVER!");
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_ON);
+    }
+    setcursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    squidprint("GAME OVER!");
   } else if (status == CONGRATS) {
-    arduboy.digitalWriteRGB(RGB_ON, RGB_ON, RGB_OFF);
-    arduboy.setCursor(WIDTH / 2 - 8 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-    arduboy.print("CONGRATULATIONS!");
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_ON, RGB_ON, RGB_OFF);
+    }
+    setcursor(WIDTH / 2 - 8 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+    squidprint("CONGRATULATIONS!");
   }
 
   if (statustimer > statustimermax / 2) {  // 1st half

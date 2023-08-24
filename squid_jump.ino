@@ -14,8 +14,13 @@ ArduboyTones sound(arduboy.audio.enabled);
 
 #include <limits.h>
 
-#define CHAR_WIDTH 6
-#define CHAR_HEIGHT 8
+#define MOD(a, b) ((((a) % (b)) + (b)) % (b))
+
+// #define CHAR_WIDTH 6
+// #define CHAR_HEIGHT 8
+#define CHAR_WIDTH 7
+#define CHAR_HEIGHT 6
+
 
 // Game states
 #define GAME_TITLE 0
@@ -23,7 +28,10 @@ ArduboyTones sound(arduboy.audio.enabled);
 // #define GAME_OVER 2
 #define GAME_STATUS 3
 // #define GAME_CONGRATS 4
+#define GAME_PAUSE 5
 int gamestate = GAME_TITLE;
+
+#define PAUSE_PADDING 2
 
 // Graphics
 int sprite = REGULAR;  // Default
@@ -87,38 +95,103 @@ bool proceedwithA = false;
 
 uint16_t currentstagetimer = 0;
 
-bool showtextblink = true;
+#define MENU_SPACING 8
+#define MENU_X WIDTH / 2 - CHAR_WIDTH * 2
+#define MENU_START HEIGHT / 2 - CHAR_HEIGHT / 2
+#define MENU_COUNT 3
+#define ARROW_SPACING 2
+int menupos = 0;
+byte levelpos = 0;
+bool iconpos = 0;
+
+bool led = true;
+
+#define PLAY 0
+#define SCORE 1
+#define ICON 2
 
 
 // FUNCTIONS
 #include "Stages.hpp"
+#include "Scripts.hpp"
 #include "Status.hpp"
 
-
-void titlescreen() {
-  arduboy.setCursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-  arduboy.print("SQUID JUMP");
-
-  arduboy.setCursor((WIDTH - 16 * CHAR_WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("PRESS");
-
-  if (showtextblink) {
-    arduboy.print(" A ");
+void titleinput() {
+  if (arduboy.justPressed(UP_BUTTON)) {
+    menupos--;
+    iconpos = 0;
+  }
+  if (arduboy.justPressed(DOWN_BUTTON)) {
+    menupos++;
+    iconpos = 0;
+  }
+  if (menupos == PLAY) {
+    if (arduboy.justPressed(LEFT_BUTTON) && levelpos > 0) {
+      levelpos--;
+    }
+    if (arduboy.justPressed(RIGHT_BUTTON) && (levelpos < 4 && LEVELPOS(levelpos + 1) <= toplevel)) {
+      levelpos++;
+    }
+  } else if (menupos == ICON) {
+    if (arduboy.justPressed(LEFT_BUTTON) || arduboy.justPressed(RIGHT_BUTTON)) {
+      iconpos = !iconpos;
+    }
   }
 
-  arduboy.setCursor((WIDTH) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  arduboy.print("TO START");
-
-
-
-  if (arduboy.everyXFrames(30)) {
-    showtextblink = !showtextblink;
-  }
-
+  menupos = MOD(menupos, MENU_COUNT);
 
   if (arduboy.justPressed(A_BUTTON)) {
-    startgame();
+    switch (menupos) {
+      case PLAY:
+        stage.num = 1 + levelpos * 5;
+        startgame();
+        break;
+
+      case ICON:
+        if (!iconpos) {
+          arduboy.audio.toggle();
+        } else {
+          led = !led;
+        }
+        break;
+    }
   }
+}
+
+void titlescreen() {
+  titleinput();
+
+  setcursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
+  squidprint("SQUID JUMP");
+
+  setcursor(MENU_X, MENU_START);
+  squidprint("PLAY");
+
+  if (levelpos < 2) {
+    setcursor(MENU_X + 4 * CHAR_WIDTH + 2 * ARROW_SPACING + ARROW_WIDTH + CHAR_WIDTH / 2, MENU_START);
+  } else {
+    setcursor(MENU_X + 4 * CHAR_WIDTH + 2 * ARROW_SPACING + ARROW_WIDTH, MENU_START);
+  }
+  squidprint(LEVELPOS(levelpos));
+
+  if (menupos == PLAY) {
+    Sprites::drawOverwrite(MENU_X + 4 * CHAR_WIDTH + ARROW_SPACING, MENU_START, ArrowL, !(levelpos > 0));
+    Sprites::drawOverwrite(MENU_X + (4 + 2) * CHAR_WIDTH + ARROW_SPACING * 3 + ARROW_WIDTH, MENU_START, ArrowR, !(levelpos < 4 && LEVELPOS(levelpos + 1) <= toplevel));
+  }
+
+  setcursor(MENU_X, MENU_START);
+
+  setcursor(MENU_X, MENU_START + MENU_SPACING);
+  squidprint("SCORE");
+
+  Sprites::drawOverwrite(MENU_X, MENU_START + MENU_SPACING * 2, Sound, arduboy.audio.enabled());
+
+  Sprites::drawOverwrite(MENU_X + 18 + POINTER_WIDTH, MENU_START + MENU_SPACING * 2, LED, led);
+
+
+  Sprites::drawOverwrite(MENU_X - 12 + 26 * iconpos, MENU_START - 1 + MENU_SPACING * menupos + 2 * (menupos == ICON), Pointer, 0);
+
+  Sprites::drawOverwrite(0, HEIGHT - COPYRIGHT_HEIGHT, Copyright, 0);
 }
 
 void startgame() {
@@ -126,7 +199,6 @@ void startgame() {
   score = 0;
   stagebonus = 0;
   timebonus = 0;
-  stage.num = 1;
 
   resetstage();
   setupstatus(START);
@@ -149,8 +221,8 @@ void gameinput() {
     } else if (player.charge > MAX_CHARGE) {
       player.charge = MAX_CHARGE;
     }
-  }
-  if (arduboy.justReleased(A_BUTTON)) {
+  } else {  // When A Button not pressed
+            // if (arduboy.justReleased(A_BUTTON)) {
     if (player.charge >= MAX_CHARGE / CHARGE_NUM) {
       float newvelocity = 4.0 * player.charge / MAX_CHARGE;
       if (newvelocity > player.velocity) {
@@ -173,19 +245,8 @@ void gameinput() {
   }
 
   if (arduboy.justPressed(B_BUTTON)) {
-    if (arduboy.pressed(UP_BUTTON)) {
-      lives++;
-    } else if (arduboy.pressed(DOWN_BUTTON)) {
-      lives--;
-    } else if (arduboy.pressed(LEFT_BUTTON)) {
-      stage.num--;
-    } else if (arduboy.pressed(RIGHT_BUTTON)) {
-      stage.num++;
-    }
+    gamestate = GAME_PAUSE;
   }
-
-  // arduboy.print(player.charge);
-  // arduboy.print(" ");
 }
 
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
@@ -293,7 +354,7 @@ void physics() {
         stage.platforms[k].facingright = false;
       }
     } else if (stage.platforms[k].type == CONVEYOR_PLATFORM) {
-      if (arduboy.frameCount % (5 - stage.speed) == 0) {
+      if (currentstagetimer % (5 - stage.speed) == 0) {
         if (stage.platforms[k].facingright) {
           if (stage.platforms[k].sprite == 0) {
             stage.platforms[k].sprite = 7;
@@ -424,8 +485,6 @@ void movecamera() {
   } else if (player.intY() + camerapos > CAM_LOWER_BOUNDARY) {
     camerapos = -player.intY() + CAM_LOWER_BOUNDARY;
   }
-  // arduboy.print(camerapos);
-  // arduboy.print(player.y);
 }
 
 bool cull(struct Platform platform) {
@@ -494,7 +553,7 @@ void drawgame() {
   Sprites::drawExternalMask(player.x, player.y + camerapos, Player, Player_Mask, sprite, sprite);
 
   if (player.powerupstate == POWERUP_JELLY || player.powerupstate == POWERUP_STAR) {
-    Sprites::drawSelfMasked(player.x - 1, player.y - 1 + camerapos, Sparkle, (arduboy.frameCount % 20) / 10);
+    Sprites::drawSelfMasked(player.x - 1, player.y - 1 + camerapos, Sparkle, (currentstagetimer % 20) / 10);
   }
 }
 
@@ -507,7 +566,7 @@ void gameplay() {
   powerups();
   physics();
   movecamera();
-  if (gamestate == GAME_PLAY) {  // Prevents flashes when going to status screen
+  if (gamestate == GAME_PLAY || gamestate == GAME_PAUSE) {  // Prevents flashes when going to status screen (pause to prevent screen being wiped)
     drawgame();
   }
 }
@@ -527,6 +586,27 @@ void updatetops() {
     saveEEPROM();
   }
 }
+byte awa = 0;
+void pause() {
+  if (arduboy.justPressed(B_BUTTON)) {
+    gamestate = GAME_PLAY;
+  }
+
+  if (arduboy.justPressed(UP_BUTTON)) {
+    lives++;
+  } else if (arduboy.justPressed(DOWN_BUTTON)) {
+    lives--;
+  } else if (arduboy.justPressed(LEFT_BUTTON)) {
+    stage.num--;
+  } else if (arduboy.justPressed(RIGHT_BUTTON)) {
+    stage.num++;
+  }
+
+  arduboy.fillRect((WIDTH - 6 * CHAR_WIDTH) / 2 - PAUSE_PADDING - 1, (HEIGHT - CHAR_HEIGHT) / 2 - PAUSE_PADDING - 1, CHAR_WIDTH * 6 + 2 * (PAUSE_PADDING + 1), CHAR_HEIGHT + 2 * (PAUSE_PADDING + 1), WHITE);
+  arduboy.fillRect((WIDTH - 6 * CHAR_WIDTH) / 2 - PAUSE_PADDING, (HEIGHT - CHAR_HEIGHT) / 2 - PAUSE_PADDING, CHAR_WIDTH * 6 + 2 * PAUSE_PADDING, CHAR_HEIGHT + 2 * PAUSE_PADDING, BLACK);
+  setcursor((WIDTH - 6 * CHAR_WIDTH) / 2, (HEIGHT - CHAR_HEIGHT) / 2);
+  squidprint("PAUSED");
+}
 
 void gameloop() {
   switch (gamestate) {
@@ -541,6 +621,10 @@ void gameloop() {
     case GAME_STATUS:
       gamestatus();
       break;
+
+    case GAME_PAUSE:
+      pause();
+      break;
   }
 }
 
@@ -552,7 +636,6 @@ void setup() {
   arduboy.clear();
 
   initEEPROM();
-  //startgame();  // For testing only
 }
 
 void loop() {
@@ -560,9 +643,11 @@ void loop() {
     return;
   }
 
-  arduboy.setCursor(0, 0);
+  setcursor(0, 0);
   arduboy.pollButtons();
-  arduboy.clear();
+  if (gamestate != GAME_PAUSE) {
+    arduboy.clear();
+  }
 
   gameloop();
 
