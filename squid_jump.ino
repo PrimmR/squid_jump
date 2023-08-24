@@ -95,6 +95,8 @@ bool proceedwithA = false;
 
 uint16_t currentstagetimer = 0;
 
+uint16_t quittimer = 0;
+
 #define MENU_SPACING 8
 #define MENU_X WIDTH / 2 - CHAR_WIDTH * 2
 #define MENU_START HEIGHT / 2 - CHAR_HEIGHT / 2
@@ -334,8 +336,10 @@ void physics() {
   // Boundaries
   if (player.intX() < 0) {
     player.x = 0;
+    player.xvelocity = 0;
   } else if (player.intX() + PLAYER_SIZE > WIDTH) {
     player.x = WIDTH - PLAYER_SIZE;
+    player.xvelocity = 0;
   }
 
   // Platform movement
@@ -590,6 +594,27 @@ byte awa = 0;
 void pause() {
   if (arduboy.justPressed(B_BUTTON)) {
     gamestate = GAME_PLAY;
+    quittimer = 0;
+  }
+  if (arduboy.pressed(UP_BUTTON)) {
+    quittimer++;
+  } else {
+    quittimer = 0;
+  }
+
+  if (quittimer >= 4 * 60) {
+    updatetops();
+    setupstatus(GAMEOVER);
+    quittimer = 0;
+  } else if (quittimer > 30 && quittimer % 60 >= 0 && quittimer % 60 <= 14) {
+    if (led) {
+      arduboy.digitalWriteRGB(RGB_ON, RGB_OFF, RGB_ON);
+    }
+    if (quittimer % 60 == 0) {
+      sound.tones(powerup_sound);
+    }
+  } else {
+    arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
   }
 
   if (arduboy.justPressed(UP_BUTTON)) {
