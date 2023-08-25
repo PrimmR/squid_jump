@@ -202,8 +202,11 @@ void build_platforms() {                                                        
         break;
     }
 
-    // Make double edges impossible?
-    int x = random(0, (WIDTH / BLOCK_SIZE - len) + 1) * BLOCK_SIZE;
+    // Offset 2 and 3 in so that is possible to jump between opposite platforms
+    int xlow = (4 - len <= 0) ? 0 : 4 - len;
+    int xhigh = ((WIDTH / BLOCK_SIZE - 4 + len >= WIDTH / BLOCK_SIZE) ? WIDTH / BLOCK_SIZE : (WIDTH / BLOCK_SIZE - 4 + len)) - len + 1;
+
+    int x = random(xlow, xhigh) * BLOCK_SIZE;
     int y = lastheight - random(5, 10) * BLOCK_SIZE;
     bool facingright = (type == JELLYFISH_PLATFORM || type == CONVEYOR_PLATFORM) ? random(0, 2) : false;
     byte sprite = 0;

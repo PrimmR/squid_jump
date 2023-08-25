@@ -345,6 +345,11 @@ void squidprint(char* string) {
   }
 }
 
+void scoresquidprint(unsigned long num) {
+  char cstr[16];
+  squidprint(ultoa(num, cstr, 10));
+}
+
 void squidprint(int num) {
   char cstr[16];
   squidprint(itoa(num, cstr, 10));

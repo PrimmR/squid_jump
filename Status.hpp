@@ -19,16 +19,16 @@ void drawpoints() {
 
   setcursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
   squidprint("SCORE: ");
-  squidprint(score);
+  scoresquidprint(score);
 }
 
 void drawhighscore() {
   setcursor(WIDTH / 2 - 6 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
   squidprint("SCORE: ");
-  squidprint(score);
+  scoresquidprint(score);
 
-  setcursor(WIDTH / 2 - 9 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
-  squidprint("HI SCORE: ");
+  setcursor(WIDTH / 2 - 8 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  squidprint("HISCORE: ");
   squidprint(topscore);
 }
 
@@ -41,8 +41,8 @@ void setupstatus(int event) {
   }
 
   status = event;
-  statustimer = 240;
-  statustimermax = 240;
+  statustimer = 180;
+  statustimermax = 180;
   gamestate = GAME_STATUS;
 }
 
@@ -97,11 +97,9 @@ void gamestatus() {
     }
   }
 
-  if (arduboy.justPressed(A_BUTTON)) {  // Just for testing?
-    statustimer = 0;
-  }
-
-
+  // if (arduboy.justPressed(A_BUTTON)) {  // Just for testing?
+  //   statustimer = 0;
+  // }
 
   if (proceedwithA) {
     if (arduboy.justPressed(A_BUTTON)) {

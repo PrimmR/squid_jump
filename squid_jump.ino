@@ -80,7 +80,9 @@ int camerapos = 0;  // + moves screen up
 // Status
 byte lives = 3;
 #define EXTRA_LIFE 10000
+#define MAX_LIVES 5
 uint32_t score = 0;
+#define MAX_SCORE 99999
 int stagebonus = 0;
 int timebonus = 0;
 #define MISS 0
@@ -97,20 +99,21 @@ uint16_t currentstagetimer = 0;
 
 uint16_t quittimer = 0;
 
-#define MENU_SPACING 8
-#define MENU_X WIDTH / 2 - CHAR_WIDTH * 2
-#define MENU_START HEIGHT / 2 - CHAR_HEIGHT / 2
+#define MENU_SPACING 9
+#define MENU_START LOGO_HEIGHT + 4
 #define MENU_COUNT 3
+#define ARROW_L_OFFSET 12
 #define ARROW_SPACING 2
+#define MENU_X (WIDTH - ((4 + 2) * CHAR_WIDTH + ARROW_SPACING * 3 + ARROW_WIDTH)) / 2
 int menupos = 0;
 byte levelpos = 0;
-bool iconpos = 0;
 
 bool led = true;
+byte ledtimer = 0;
 
 #define PLAY 0
-#define SCORE 1
-#define ICON 2
+#define MUTE 1
+#define TOGGLELED 2
 
 
 // FUNCTIONS
@@ -121,11 +124,9 @@ bool led = true;
 void titleinput() {
   if (arduboy.justPressed(UP_BUTTON)) {
     menupos--;
-    iconpos = 0;
   }
   if (arduboy.justPressed(DOWN_BUTTON)) {
     menupos++;
-    iconpos = 0;
   }
   if (menupos == PLAY) {
     if (arduboy.justPressed(LEFT_BUTTON) && levelpos > 0) {
@@ -134,10 +135,6 @@ void titleinput() {
     if (arduboy.justPressed(RIGHT_BUTTON) && (levelpos < 4 && LEVELPOS(levelpos + 1) <= toplevel)) {
       levelpos++;
     }
-  } else if (menupos == ICON) {
-    if (arduboy.justPressed(LEFT_BUTTON) || arduboy.justPressed(RIGHT_BUTTON)) {
-      iconpos = !iconpos;
-    }
   }
 
   menupos = MOD(menupos, MENU_COUNT);
@@ -145,15 +142,31 @@ void titleinput() {
   if (arduboy.justPressed(A_BUTTON)) {
     switch (menupos) {
       case PLAY:
+        ledtimer = 0;
         stage.num = 1 + levelpos * 5;
         startgame();
         break;
 
-      case ICON:
-        if (!iconpos) {
-          arduboy.audio.toggle();
-        } else {
-          led = !led;
+      case MUTE:
+        arduboy.audio.toggle();
+        if (arduboy.audio.enabled()) {
+          sound.tones(powerup_sound);
+        }
+        break;
+
+      case TOGGLELED:
+        led = !led;
+        if (led) {
+          ledtimer = 30;
+          // arduboy.digitalWriteRGB(RGB_OFF, RGB_ON, RGB_OFF);
+          bool r = random(2);
+          bool g = random(2);
+          bool b = random(2);
+          if (r + g + b != 3) {
+            arduboy.digitalWriteRGB(r, g, b);
+          } else {
+            arduboy.digitalWriteRGB(RGB_ON, RGB_ON, RGB_ON);
+          }
         }
         break;
     }
@@ -163,8 +176,13 @@ void titleinput() {
 void titlescreen() {
   titleinput();
 
-  setcursor(WIDTH / 2 - 5 * CHAR_WIDTH, HEIGHT / 4 - CHAR_HEIGHT / 2);
-  squidprint("SQUID JUMP");
+  if (ledtimer > 0) {
+    ledtimer--;
+  } else {
+    arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
+  }
+
+  Sprites::drawOverwrite((WIDTH - LOGO_WIDTH) / 2, 0, Logo, 0);
 
   setcursor(MENU_X, MENU_START);
   squidprint("PLAY");
@@ -181,17 +199,18 @@ void titlescreen() {
     Sprites::drawOverwrite(MENU_X + (4 + 2) * CHAR_WIDTH + ARROW_SPACING * 3 + ARROW_WIDTH, MENU_START, ArrowR, !(levelpos < 4 && LEVELPOS(levelpos + 1) <= toplevel));
   }
 
-  setcursor(MENU_X, MENU_START);
 
-  setcursor(MENU_X, MENU_START + MENU_SPACING);
-  squidprint("SCORE");
+  // setcursor(MENU_X, MENU_START + MENU_SPACING);
+  setcursor(COPYRIGHT_WIDTH + CHAR_WIDTH, HEIGHT - CHAR_HEIGHT);
+  squidprint("HISCORE ");
+  scoresquidprint(topscore);
 
-  Sprites::drawOverwrite(MENU_X, MENU_START + MENU_SPACING * 2, Sound, arduboy.audio.enabled());
+  Sprites::drawOverwrite((WIDTH - ICON_SIZE) / 2, MENU_START + MENU_SPACING, Sound, arduboy.audio.enabled());
 
-  Sprites::drawOverwrite(MENU_X + 18 + POINTER_WIDTH, MENU_START + MENU_SPACING * 2, LED, led);
+  Sprites::drawOverwrite((WIDTH - ICON_SIZE) / 2, MENU_START + MENU_SPACING * 2, LED, led);
 
 
-  Sprites::drawOverwrite(MENU_X - 12 + 26 * iconpos, MENU_START - 1 + MENU_SPACING * menupos + 2 * (menupos == ICON), Pointer, 0);
+  Sprites::drawOverwrite(((menupos != 0) ? (WIDTH - ICON_SIZE) / 2 : MENU_X) - ARROW_L_OFFSET, MENU_START - (1 * (menupos == 0)) + MENU_SPACING * menupos, Pointer, 0);
 
   Sprites::drawOverwrite(0, HEIGHT - COPYRIGHT_HEIGHT, Copyright, 0);
 }
@@ -464,10 +483,13 @@ void nextlevel() {
   int prevscorelife = score / EXTRA_LIFE;
 
   score += stagebonus + timebonus;
+  if (score > MAX_SCORE) {
+    score = MAX_SCORE;
+  }
 
   int scorelife = score / EXTRA_LIFE;
 
-  if (scorelife > prevscorelife && lives < 5) {
+  if (scorelife > prevscorelife && lives < MAX_LIVES) {
     lives++;
   }
 
@@ -590,7 +612,7 @@ void updatetops() {
     saveEEPROM();
   }
 }
-byte awa = 0;
+
 void pause() {
   if (arduboy.justPressed(B_BUTTON)) {
     gamestate = GAME_PLAY;
@@ -617,15 +639,15 @@ void pause() {
     arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
   }
 
-  if (arduboy.justPressed(UP_BUTTON)) {
-    lives++;
-  } else if (arduboy.justPressed(DOWN_BUTTON)) {
-    lives--;
-  } else if (arduboy.justPressed(LEFT_BUTTON)) {
-    stage.num--;
-  } else if (arduboy.justPressed(RIGHT_BUTTON)) {
-    stage.num++;
-  }
+  // if (arduboy.justPressed(UP_BUTTON)) {
+  //   lives++;
+  // } else if (arduboy.justPressed(DOWN_BUTTON)) {
+  //   lives--;
+  // } else if (arduboy.justPressed(LEFT_BUTTON)) {
+  //   stage.num--;
+  // } else if (arduboy.justPressed(RIGHT_BUTTON)) {
+  //   stage.num++;
+  // }
 
   arduboy.fillRect((WIDTH - 6 * CHAR_WIDTH) / 2 - PAUSE_PADDING - 1, (HEIGHT - CHAR_HEIGHT) / 2 - PAUSE_PADDING - 1, CHAR_WIDTH * 6 + 2 * (PAUSE_PADDING + 1), CHAR_HEIGHT + 2 * (PAUSE_PADDING + 1), WHITE);
   arduboy.fillRect((WIDTH - 6 * CHAR_WIDTH) / 2 - PAUSE_PADDING, (HEIGHT - CHAR_HEIGHT) / 2 - PAUSE_PADDING, CHAR_WIDTH * 6 + 2 * PAUSE_PADDING, CHAR_HEIGHT + 2 * PAUSE_PADDING, BLACK);
