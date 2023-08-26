@@ -99,8 +99,9 @@ uint16_t currentstagetimer = 0;
 
 uint16_t quittimer = 0;
 
+#define LOGO_START 1
 #define MENU_SPACING 9
-#define MENU_START LOGO_HEIGHT + 4
+#define MENU_START LOGO_START + LOGO_HEIGHT + 4
 #define MENU_COUNT 3
 #define ARROW_L_OFFSET 12
 #define ARROW_SPACING 2
@@ -143,7 +144,11 @@ void titleinput() {
     switch (menupos) {
       case PLAY:
         ledtimer = 0;
+
         stage.num = 1 + levelpos * 5;
+
+        menupos = 0;
+        levelpos = 0;
         startgame();
         break;
 
@@ -182,7 +187,7 @@ void titlescreen() {
     arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
   }
 
-  Sprites::drawOverwrite((WIDTH - LOGO_WIDTH) / 2, 0, Logo, 0);
+  Sprites::drawOverwrite((WIDTH - LOGO_WIDTH) / 2, LOGO_START, Logo, 0);
 
   setcursor(MENU_X, MENU_START);
   squidprint("PLAY");
