@@ -1,4 +1,6 @@
-// PrimmR 2023
+// Copyright © 2023 PrimmR 
+// Licensed under GNU General Public License v3.0
+
 // Squid Jump
 
 #include <Arduboy2.h>
