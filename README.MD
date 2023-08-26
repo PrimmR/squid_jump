@@ -31,8 +31,8 @@ The emulator that I used to test the game was [Ardens](github.com/tiberiusbrown/
 
 ## Gallery
 
-![Title Screen](Screenshots/Title.png)
-![Gameplay 1](Screenshots/Jellies.png)
-![Gameplay 2](Screenshots/Jellyfish.png)
-![Gameplay 3](Screenshots/Poison.png)
-![Gameplay 4](Screenshots/Ice.png)
+![Title Screen](Screenshots/Titlex4.png)
+![Gameplay 1](Screenshots/Jelliesx4.png)
+![Gameplay 2](Screenshots/Jellyfishx4.png)
+![Gameplay 3](Screenshots/Poisonx4.png)
+![Gameplay 4](Screenshots/Icex4.png)
