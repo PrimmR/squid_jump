@@ -31,6 +31,7 @@ The emulator that I used to test the game was [Ardens](https://github.com/tiberi
 
 ## Gallery
 
+![Banner](Screenshots/Banner.png)
 ![Title Screen](Screenshots/Titlex4.png)
 ![Gameplay 1](Screenshots/Jelliesx4.png)
 ![Gameplay 2](Screenshots/Jellyfishx4.png)
