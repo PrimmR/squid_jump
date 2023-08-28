@@ -280,7 +280,7 @@ void gameinput() {
 // Calculates whether platform would be hit next frame (may fail if collision boxes both 1px)
 bool collision(Platform platform, int height) {  // Assume that it's always called by player
   if (player.velocity <= 0) {
-    Rect ray = Rect(player.intX(), player.intY() + PLAYER_SIZE + camerapos, PLAYER_SIZE, height);
+    Rect ray = Rect(player.intX() + PLAYER_COLLISION_CUT, player.intY() + PLAYER_SIZE + camerapos, PLAYER_SIZE - 2 * PLAYER_COLLISION_CUT, height);
     Rect platformtop = Rect(platform.x, platform.y + camerapos, platform.len * BLOCK_SIZE, 2);
     // arduboy.fillRect(player.x, player.y + PLAYER_SIZE + camerapos, PLAYER_SIZE, -1 * height); // Visual
     // arduboy.fillRect(platform.x, platform.y + camerapos, platform.len * BLOCK_SIZE, 2); // Visual

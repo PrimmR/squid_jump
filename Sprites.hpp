@@ -5,6 +5,7 @@
 #define CHARGE_NUM 3
 
 #define PLAYER_SIZE 15
+#define PLAYER_COLLISION_CUT 2
 const uint8_t PROGMEM Player[] = {
   // Regular
   15,
