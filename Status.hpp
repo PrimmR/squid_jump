@@ -4,7 +4,7 @@ void drawlivesandlevel() {
     Sprites::drawOverwrite((WIDTH - LIFE_SIZE) / 2 - (lives - 1) * (LIFE_SPACING / 2) + LIFE_SPACING * i, (HEIGHT - LIFE_SIZE) / 2, Life, 0);
   }
 
-  setcursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  setcursor((WIDTH - (GetNumberOfDigits(stage.num) + 7) * CHAR_WIDTH)/2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
   squidprint("LEVEL: ");
   squidprint(stage.num);
 }
