@@ -17,19 +17,19 @@ void drawpoints() {
   squidprint("+");
   squidprint(timebonus);
 
-  setcursor(WIDTH / 2 - 4 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  setcursor((WIDTH - CHAR_WIDTH * (7 + GetNumberOfDigits(score))) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
   squidprint("SCORE: ");
   scoresquidprint(score);
 }
 
 void drawhighscore() {
-  setcursor(WIDTH / 2 - 6 * CHAR_WIDTH, HEIGHT / 2 - CHAR_HEIGHT / 2);
+  setcursor((WIDTH - CHAR_WIDTH * (7 + GetNumberOfDigits(score))) / 2, HEIGHT / 2 - CHAR_HEIGHT / 2);
   squidprint("SCORE: ");
   scoresquidprint(score);
 
-  setcursor(WIDTH / 2 - 8 * CHAR_WIDTH, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
+  setcursor((WIDTH - CHAR_WIDTH * (9 + GetNumberOfDigits(topscore))) / 2, HEIGHT / 4 * 3 - CHAR_HEIGHT / 2);
   squidprint("HISCORE: ");
-  squidprint(topscore);
+  scoresquidprint(topscore);
 }
 
 
