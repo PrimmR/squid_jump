@@ -1,7 +1,7 @@
 // Copyright © 2023 PrimmR 
 // Licensed under GNU General Public License v3.0
 
-// Squid Jump v1.1
+// Squid Jump v1.2
 
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
